@@ -1,0 +1,72 @@
+# Driffle Links — production stack (Deployer-friendly: single web + Postgres + Redis)
+# Validate: `docker compose -f docker-compose.prod.yml config`
+
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+    image: driffle-links-web:latest
+    restart: unless-stopped
+    ports:
+      - "${WEB_PUBLISH_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL}
+      SHORT_LINK_HOST: ${SHORT_LINK_HOST:-go.driffle.com}
+      NEXT_PUBLIC_SHORT_LINK_HOST: ${NEXT_PUBLIC_SHORT_LINK_HOST:-go.driffle.com}
+      ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-driffle.com}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      CRON_SECRET: ${CRON_SECRET:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: driffle_links
+    volumes:
+      - driffle_links_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d driffle_links"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - driffle_links_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  driffle_links_pg:
+  driffle_links_redis:

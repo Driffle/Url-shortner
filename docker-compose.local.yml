@@ -1,0 +1,27 @@
+# Local demo: Postgres + Redis only. Run Next with `npm run dev` from apps/web.
+# Usage: docker compose -f docker-compose.local.yml up -d
+
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: driffle_links
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d driffle_links"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

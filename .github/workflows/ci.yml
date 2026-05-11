@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: apps/web
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: CI=true npm run lint
+
+      - name: Build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driffle_links
+          REDIS_URL: redis://localhost:6379
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: "01234567890123456789012345678901"
+          GOOGLE_CLIENT_ID: "ci-placeholder-google-client-id"
+          GOOGLE_CLIENT_SECRET: "ci-placeholder-google-client-secret"
+          PUBLIC_APP_URL: http://localhost:3000
+        run: npm run build

@@ -1,0 +1,231 @@
+// Driffle Links — internal link management & attribution
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum LinkStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+}
+
+enum RollupGranularity {
+  HOUR
+  DAY
+}
+
+// ---------- Auth (NextAuth-compatible) ----------
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  role          UserRole  @default(VIEWER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  campaignsOwned Campaign[] @relation("CampaignOwner")
+  linksCreated  Link[]     @relation("LinkCreator")
+  auditLogs     AuditLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- Campaigns ----------
+model Campaign {
+  id          String          @id @default(cuid())
+  name        String
+  description String?         @db.Text
+  ownerId     String
+  status      CampaignStatus  @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  tags        String[]        @default([])
+  archivedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  owner User   @relation("CampaignOwner", fields: [ownerId], references: [id])
+  links   Link[]
+  rollups AnalyticsRollup[]
+
+  @@index([ownerId])
+  @@index([status, archivedAt])
+  @@index([createdAt])
+}
+
+// ---------- Links ----------
+model Link {
+  id              String     @id @default(cuid())
+  slug            String     @unique
+  destinationUrl  String     @db.Text
+  campaignId      String?
+  expiresAt       DateTime?
+  notes           String?    @db.Text
+  tags            String[]   @default([])
+  status          LinkStatus @default(ACTIVE)
+  createdById     String
+  clickCount      Int        @default(0)
+  uniqueClickEst  Int        @default(0) // HLL or bloom-backed estimate optional; MVP counter from rollups
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  campaign   Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  createdBy  User         @relation("LinkCreator", fields: [createdById], references: [id])
+  clickEvents ClickEvent[]
+  rollups    AnalyticsRollup[]
+
+  @@index([campaignId])
+  @@index([status, expiresAt])
+  @@index([createdAt])
+  @@index([tags], type: Gin)
+}
+
+// ---------- Dimensions (normalized for rollups / top-N) ----------
+model Referrer {
+  id        String   @id @default(cuid())
+  domain    String   @unique // normalized host, lowercased
+  createdAt DateTime @default(now())
+
+  clickEvents ClickEvent[]
+
+  @@index([domain])
+}
+
+model Device {
+  id         String   @id @default(cuid())
+  signature  String   @unique // hash(browser|os|deviceClass)
+  deviceType String // mobile | tablet | desktop | unknown
+  osName     String?
+  browserName String?
+  createdAt  DateTime @default(now())
+
+  clickEvents ClickEvent[]
+
+  @@index([deviceType])
+}
+
+// ---------- Click stream (append-only; partition-friendly) ----------
+model ClickEvent {
+  id               String   @id @default(cuid())
+  linkId           String
+  referrerId       String?
+  deviceId         String?
+  visitorHash      String // daily rotating salt + IP + UA — unique click heuristic
+  countryCode      String?  @db.Char(2)
+  isBot            Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  link     Link      @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  referrer Referrer? @relation(fields: [referrerId], references: [id], onDelete: SetNull)
+  device   Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([linkId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@index([visitorHash, linkId, createdAt])
+  @@index([isBot, createdAt])
+}
+
+// ---------- Pre-aggregated analytics ----------
+// scope: LINK + scopeId=linkId | CAMPAIGN + scopeId=campaignId | GLOBAL + scopeId=null
+model AnalyticsRollup {
+  id            String            @id @default(cuid())
+  granularity   RollupGranularity
+  bucketStart   DateTime // UTC bucket start
+  scopeType     String // LINK | CAMPAIGN | GLOBAL
+  scopeId       String  @default("") // link/campaign id, or "" for GLOBAL
+  linkId        String?
+  campaignId    String?
+  totalClicks   Int               @default(0)
+  uniqueClicks  Int               @default(0)
+  topReferrers  Json? // [{ domain, count }]
+  topCountries  Json?
+  deviceMix     Json? // { mobile: n, desktop: n, ... }
+  updatedAt     DateTime          @updatedAt
+
+  link     Link?     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([granularity, bucketStart, scopeType, scopeId])
+  @@index([bucketStart(sort: Desc)])
+  @@index([linkId, bucketStart])
+  @@index([campaignId, bucketStart])
+  @@index([scopeType, scopeId, bucketStart])
+}
+
+// ---------- Audit ----------
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipHash     String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([userId])
+}

@@ -1,0 +1,16 @@
+---
+description: Driffle Links internal platform — architecture and coding conventions
+globs: apps/web/**/*
+alwaysApply: false
+---
+
+# Driffle Links — Cursor rules
+
+- **Feature-first**: place UI and hooks under `src/features/<domain>/`, shared primitives under `src/shared/`, and server-only code under `src/server/`.
+- **No business logic in presentation**: pages/components orchestrate; validation uses Zod in `src/shared/validations/`; persistence goes through repositories; orchestration in services.
+- **Strong typing**: avoid `any`; prefer Prisma types and `z.infer` from schemas.
+- **Auth & RBAC**: use `auth()` in Server Actions and Route Handlers; enforce permissions with `can()` from `src/shared/lib/rbac.ts` — never trust client-only checks.
+- **Redirects**: short URLs are served from `src/app/r/[slug]/route.ts` — keep this path fast; use `after()` for ingestion, never block redirects on analytics.
+- **Environment**: validate new variables in `src/shared/validations/env.ts` and document them in `.env.example`.
+- **Security**: block private/localhost destinations in `url-safety.ts`; rate-limit redirects; hash visitor identifiers; treat Redis failures as soft-degraded (queue fallback).
+- **Diff discipline**: minimal, task-scoped changes; match existing patterns; avoid drive-by refactors.
