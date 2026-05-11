@@ -2,6 +2,8 @@
 
 Internal link management and campaign attribution for Driffle. This document is the single source of truth for system design, deployment, and evolution.
 
+**UI:** Product shell uses a **white + blue** theme (cool white surfaces, blue primary `hsl(224 76% 48%)`, blue gradient login). The app runs in **forced light mode** for consistent internal branding.
+
 ---
 
 ## 1. System architecture
