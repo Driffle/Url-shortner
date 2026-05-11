@@ -4,13 +4,15 @@ import { signOut, useSession } from "next-auth/react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { LogOut, User } from "lucide-react";
 import { Button } from "@/shared/ui/button";
-import { PUBLIC_APP_NO_AUTH } from "@/shared/lib/auth-bypass";
+import { isPublicAppNoAuthEnabled } from "@/shared/lib/auth-bypass";
 
 const localAuthOff = process.env.NEXT_PUBLIC_DISABLE_AUTH === "true";
-const openAccess = PUBLIC_APP_NO_AUTH || localAuthOff;
 
 export function UserMenu() {
   const { data } = useSession();
+  const publicOpen = isPublicAppNoAuthEnabled();
+  const openAccess = publicOpen || localAuthOff;
+
   if (!data?.user) return null;
   return (
     <DropdownMenu.Root>
@@ -30,11 +32,11 @@ export function UserMenu() {
           <div className="px-2 pb-2 text-xs text-muted-foreground">Role: {data.user.role}</div>
           {openAccess && (
             <div className="border-t px-2 py-2 text-xs text-amber-800 dark:text-amber-300">
-              {PUBLIC_APP_NO_AUTH ? (
+              {publicOpen ? (
                 <>
-                  Open access (no login). To require Google sign-in, set{" "}
-                  <code className="rounded bg-muted px-0.5">PUBLIC_APP_NO_AUTH</code> to <code className="rounded bg-muted px-0.5">false</code> in{" "}
-                  <code className="rounded bg-muted px-0.5">src/shared/lib/auth-bypass.ts</code>.
+                  Open access (no login). Unset <code className="rounded bg-muted px-0.5">PUBLIC_APP_NO_AUTH</code> /{" "}
+                  <code className="rounded bg-muted px-0.5">NEXT_PUBLIC_PUBLIC_APP_NO_AUTH</code> in your env to require
+                  Google sign-in.
                 </>
               ) : (
                 <>

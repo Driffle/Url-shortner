@@ -35,9 +35,16 @@ Next.js reads **`.env.local`** (and `.env`). **Prisma CLI** only auto-loads **`.
    echo 'DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/driffle_links?schema=public"' > apps/web/.env
    ```
 
-### Public access (no login) — temporary
+### Public access (no login) — opt-in only
 
-The repo may ship with **`PUBLIC_APP_NO_AUTH = true`** in `apps/web/src/shared/lib/auth-bypass.ts`, which opens the dashboard and APIs to everyone (synthetic admin user). Set it to **`false`** and redeploy to require Google OAuth again.
+By default **sign-in is required**. To allow anyone to use the app (internal URL shortener mode), set **both** in `.env.local` / production env:
+
+| Variable | Purpose |
+|----------|---------|
+| `PUBLIC_APP_NO_AUTH=true` | Server / middleware (not exposed to the browser bundle) |
+| `NEXT_PUBLIC_PUBLIC_APP_NO_AUTH=true` | Same flag for Edge middleware + client UI hints |
+
+Omit them or set to `false` to require Google OAuth. Local-only bypass: `DISABLE_AUTH=true` (development only) still works without these flags.
 
 ### Step C — Fill `apps/web/.env.local`
 

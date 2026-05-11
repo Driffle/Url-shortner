@@ -10,6 +10,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; callbackUrl?: string }>;
 }) {
   const params = await searchParams;
+  // Open-redirect safe: only same-origin relative paths (see sanitizeCallbackUrl).
   const next = sanitizeCallbackUrl(params.callbackUrl);
 
   if (isAuthBypassed()) redirect(next);

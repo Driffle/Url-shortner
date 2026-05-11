@@ -1,16 +1,28 @@
 /**
  * Authentication bypass for the internal URL shortener.
  *
- * When `PUBLIC_APP_NO_AUTH` is `true`, the app is open to everyone: no login,
- * middleware does not enforce JWT, and `getAppSession()` uses a built-in admin user.
+ * **Open access (no login):** set `PUBLIC_APP_NO_AUTH=true` and/or
+ * `NEXT_PUBLIC_PUBLIC_APP_NO_AUTH=true` (see `.env.example`). Defaults are **off**
+ * so production never accidentally skips sign-in.
  *
- * Set to `false` and deploy to restore Google OAuth + domain restriction.
+ * **Local dev only:** `DISABLE_AUTH=true` with `NODE_ENV=development` still bypasses
+ * Google OAuth without setting the public flags above.
  */
-export const PUBLIC_APP_NO_AUTH = true;
+
+function truthyEnv(v: string | undefined): boolean {
+  return v === "true" || v === "1";
+}
+
+/** Explicit opt-in via env (server + Edge middleware + client when NEXT_PUBLIC_* is set). */
+export function isPublicAppNoAuthEnabled(): boolean {
+  return (
+    truthyEnv(process.env.PUBLIC_APP_NO_AUTH) || truthyEnv(process.env.NEXT_PUBLIC_PUBLIC_APP_NO_AUTH)
+  );
+}
 
 /**
- * Local development only: skip Google OAuth (still requires PUBLIC_APP_NO_AUTH or this + dev).
- * Hard-gated on NODE_ENV === "development" so production ignores `DISABLE_AUTH` alone.
+ * Local development only: skip Google OAuth when `DISABLE_AUTH=true`.
+ * Gated on `NODE_ENV === "development"`.
  */
 export function isLocalAuthDisabled(): boolean {
   return process.env.NODE_ENV === "development" && process.env.DISABLE_AUTH === "true";
@@ -18,5 +30,5 @@ export function isLocalAuthDisabled(): boolean {
 
 /** True when the app should not require sign-in (public access or local dev bypass). */
 export function isAuthBypassed(): boolean {
-  return PUBLIC_APP_NO_AUTH || isLocalAuthDisabled();
+  return isPublicAppNoAuthEnabled() || isLocalAuthDisabled();
 }

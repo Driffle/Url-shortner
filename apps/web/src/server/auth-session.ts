@@ -42,7 +42,7 @@ async function ensureLocalDevUser() {
 
 /**
  * Use instead of `auth()` everywhere the app needs the current session.
- * When auth is bypassed (`PUBLIC_APP_NO_AUTH` or `DISABLE_AUTH` in dev), returns a
+ * When auth is bypassed (public env flags or `DISABLE_AUTH` in dev), returns a
  * synthetic ADMIN session backed by a real `User` row (required for FKs such as `Link.createdById`).
  */
 export async function getAppSession(): Promise<Session | null> {
