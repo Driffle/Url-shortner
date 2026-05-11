@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAppSession } from "@/server/auth-session";
-import { isLocalAuthDisabled } from "@/shared/lib/auth-bypass";
+import { isAuthBypassed } from "@/shared/lib/auth-bypass";
 import { LoginForm } from "@/features/auth/components/login-form";
 
 export default async function LoginPage({
@@ -9,7 +9,7 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; callbackUrl?: string }>;
 }) {
   const params = await searchParams;
-  if (isLocalAuthDisabled()) redirect(params.callbackUrl ?? "/dashboard");
+  if (isAuthBypassed()) redirect(params.callbackUrl ?? "/dashboard");
   const session = await getAppSession();
   if (session) redirect(params.callbackUrl ?? "/dashboard");
 

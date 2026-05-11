@@ -1,3 +1,7 @@
+/**
+ * NextAuth (Google) — still registered for `/api/auth/*`, but the app layer may bypass
+ * sign-in when `PUBLIC_APP_NO_AUTH` is true in `src/shared/lib/auth-bypass.ts`.
+ */
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import type { UserRole } from "@prisma/client";

@@ -35,6 +35,10 @@ Next.js reads **`.env.local`** (and `.env`). **Prisma CLI** only auto-loads **`.
    echo 'DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/driffle_links?schema=public"' > apps/web/.env
    ```
 
+### Public access (no login) — temporary
+
+The repo may ship with **`PUBLIC_APP_NO_AUTH = true`** in `apps/web/src/shared/lib/auth-bypass.ts`, which opens the dashboard and APIs to everyone (synthetic admin user). Set it to **`false`** and redeploy to require Google OAuth again.
+
 ### Step C — Fill `apps/web/.env.local`
 
 | Variable | Required | What it’s for |

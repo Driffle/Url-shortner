@@ -1,3 +1,4 @@
+// Google OAuth config. App entry may bypass login; see `src/shared/lib/auth-bypass.ts`.
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 

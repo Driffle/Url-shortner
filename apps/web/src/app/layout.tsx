@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   description: "Internal link management and campaign attribution",
 };
 
+export const dynamic = "force-dynamic";
+
 export const viewport: Viewport = {
   themeColor: "#2563eb",
 };
