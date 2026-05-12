@@ -304,10 +304,11 @@ See repository `.env.example` for required variables (`NEXTAUTH_*`, `GOOGLE_*`, 
 
 1. **Build image** in CI or on Deployer host: `docker compose -f docker-compose.prod.yml build web`.
 2. **Secrets**: inject `.env` via Deployer secret store — never commit real values.
-3. **DNS**: internal app on `links.internal.*`; short domain `go.driffle.com` points to same load balancer (path `/r/*`) or dedicated ingress rule.
-4. **Migrations**: run `npx prisma migrate deploy` as a pre-start or one-off task before traffic shifts.
-5. **Health**: Deployer should use `GET /api/health` (compose healthcheck already does).
-6. **Cron**: register HTTP call to `POST /api/cron/rollup` with `Authorization: Bearer $CRON_SECRET` nightly + weekly digest calling `postSlack`.
+3. **Public hostname (Cloudflare)**: in Deployer, set the FQDN after the stack is up (e.g. `shortly.driffle.net`). Deployer creates a CNAME to your tunnel and adds an ingress rule to `http://127.0.0.1:<WEB_PUBLISH_PORT>` (registered host port, e.g. `1004`). Configure the tunnel under Settings first. HTTPS is terminated at Cloudflare; set `NEXTAUTH_URL` and `PUBLIC_APP_URL` to `https://<that-hostname>` and match **Authorized redirect URIs** in Google OAuth to `https://<hostname>/api/auth/callback/google` when Google sign-in is enabled.
+4. **Short links**: if the app and `/r/*` share one hostname, set `SHORT_LINK_HOST` and `NEXT_PUBLIC_SHORT_LINK_HOST` to the same FQDN (no `https://`). Use a separate short domain only if DNS routes it to this app as well.
+5. **Migrations**: run `npx prisma migrate deploy` as a pre-start or one-off task before traffic shifts.
+6. **Health**: Deployer should use `GET /api/health` (compose healthcheck already does).
+7. **Cron**: register HTTP call to `POST /api/cron/rollup` with `Authorization: Bearer $CRON_SECRET` nightly + weekly digest calling `postSlack`.
 
 ---
 
@@ -390,4 +391,4 @@ npx prisma migrate dev   # or db push for prototype
 npm run dev
 ```
 
-Short URL in dev: `http://localhost:3000/r/{slug}` (production maps `go.driffle.com` → same app).
+Short URL in dev: `http://localhost:3000/r/{slug}` (production: use your public hostname, e.g. `https://shortly.driffle.net/r/{slug}`, with `SHORT_LINK_HOST` set to that host without scheme).
