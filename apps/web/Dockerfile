@@ -13,6 +13,15 @@ ARG DATABASE_URL="postgresql://postgres:postgres@localhost:5432/driffle_links"
 ENV DATABASE_URL=$DATABASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# `next build` loads server modules (e.g. NextAuth) that call `getEnv()` — same placeholders as CI.
+# Runtime env comes from compose/Kubernetes and replaces these; they are not copied to the final stage.
+ENV REDIS_URL=redis://127.0.0.1:6379
+ENV NEXTAUTH_URL=http://127.0.0.1:3000
+ENV PUBLIC_APP_URL=http://127.0.0.1:3000
+ENV NEXTAUTH_SECRET=01234567890123456789012345678901
+ENV GOOGLE_CLIENT_ID=build-placeholder-google-client-id
+ENV GOOGLE_CLIENT_SECRET=build-placeholder-google-client-secret
+
 RUN npx prisma generate
 RUN npm run build
 RUN npm prune --omit=dev
