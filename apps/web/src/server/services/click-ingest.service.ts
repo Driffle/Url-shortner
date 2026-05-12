@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { prisma } from "@/server/db/prisma";
 import { getRedis, RedisKeys } from "@/server/redis/client";
+import { getEnv } from "@/shared/validations/env";
 
 export type ClickIngestInput = {
   linkId: string;
@@ -42,7 +43,7 @@ function parseUa(ua: string | null): { deviceType: string; osName: string; brows
 }
 
 function visitorHash(ip: string | null, ua: string | null, dayBucket: string): string {
-  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "dev";
+  const secret = getEnv().NEXTAUTH_SECRET;
   return hash(`${secret}:${dayBucket}:${ip ?? ""}:${ua ?? ""}`);
 }
 

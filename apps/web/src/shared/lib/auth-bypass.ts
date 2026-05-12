@@ -14,6 +14,22 @@ function truthyEnv(v: string | undefined): boolean {
   return v === "true" || v === "1";
 }
 
+/** Subset of env used for bypass checks (also validated in `env.ts`). */
+export type AuthBypassEnvFields = {
+  PUBLIC_APP_NO_AUTH?: string | undefined;
+  NEXT_PUBLIC_PUBLIC_APP_NO_AUTH?: string | undefined;
+  DISABLE_AUTH?: string | undefined;
+  NODE_ENV?: string | undefined;
+};
+
+/** Same rules as runtime bypass, but reads from validated/parsed env fields. */
+export function isAuthBypassedFromEnvFields(e: AuthBypassEnvFields): boolean {
+  const open =
+    truthyEnv(e.PUBLIC_APP_NO_AUTH) || truthyEnv(e.NEXT_PUBLIC_PUBLIC_APP_NO_AUTH);
+  const localDev = e.NODE_ENV === "development" && e.DISABLE_AUTH === "true";
+  return open || localDev;
+}
+
 /** Explicit opt-in via env (server + Edge middleware + client when NEXT_PUBLIC_* is set). */
 export function isPublicAppNoAuthEnabled(): boolean {
   return (
@@ -31,5 +47,10 @@ export function isLocalAuthDisabled(): boolean {
 
 /** True when the app should not require sign-in (public access or local dev bypass). */
 export function isAuthBypassed(): boolean {
-  return isPublicAppNoAuthEnabled() || isLocalAuthDisabled();
+  return isAuthBypassedFromEnvFields({
+    PUBLIC_APP_NO_AUTH: process.env.PUBLIC_APP_NO_AUTH,
+    NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: process.env.NEXT_PUBLIC_PUBLIC_APP_NO_AUTH,
+    DISABLE_AUTH: process.env.DISABLE_AUTH,
+    NODE_ENV: process.env.NODE_ENV,
+  });
 }

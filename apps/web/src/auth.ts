@@ -9,12 +9,9 @@ import { prisma } from "@/server/db/prisma";
 import { getEnv } from "@/shared/validations/env";
 import { authConfig } from "@/auth.config";
 
-/** Auth.js v5 prefers `AUTH_SECRET`; many stacks still set `NEXTAUTH_SECRET` only. */
-const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  secret: authSecret,
+  secret: getEnv().NEXTAUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   callbacks: {

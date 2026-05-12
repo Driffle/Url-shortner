@@ -1,5 +1,14 @@
 import { z } from "zod";
-import { isAuthBypassed } from "@/shared/lib/auth-bypass";
+import { isAuthBypassedFromEnvFields } from "@/shared/lib/auth-bypass";
+
+/** Picks the first 32+ character value from `AUTH_SECRET` or `NEXTAUTH_SECRET`, or empty string. */
+function pickAuthSecret(data: { AUTH_SECRET?: string | undefined; NEXTAUTH_SECRET?: string | undefined }): string {
+  const a = (data.AUTH_SECRET ?? "").trim();
+  const n = (data.NEXTAUTH_SECRET ?? "").trim();
+  if (a.length >= 32) return a;
+  if (n.length >= 32) return n;
+  return "";
+}
 
 const envSchema = z
   .object({
@@ -11,16 +20,16 @@ const envSchema = z
     REDIS_URL: z.string().min(1),
 
     NEXTAUTH_URL: z.string().url(),
-    /** Auth.js reads `AUTH_SECRET` or `NEXTAUTH_SECRET`; either may be set (32+ chars). */
-    NEXTAUTH_SECRET: z.preprocess(
-      (val) => {
-        if (typeof val === "string" && val.length >= 32) return val;
-        const a = process.env.AUTH_SECRET;
-        if (typeof a === "string" && a.length >= 32) return a;
-        return val;
-      },
-      z.string().min(32, "Set NEXTAUTH_SECRET or AUTH_SECRET (min 32 characters)"),
-    ),
+    /** Legacy name; use either this or `AUTH_SECRET` (32+ chars). Output is normalized in `transform`. */
+    NEXTAUTH_SECRET: z.string().optional(),
+    /** Auth.js v5 name; either secret may be set. */
+    AUTH_SECRET: z.string().optional(),
+
+    /** Open access (server); validated here so bypass rules do not read raw `process.env` in Zod refiners. */
+    PUBLIC_APP_NO_AUTH: z.string().optional(),
+    NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: z.string().optional(),
+    /** Local dev only with `NODE_ENV=development`. */
+    DISABLE_AUTH: z.string().optional(),
 
     GOOGLE_CLIENT_ID: z.string().default(""),
     GOOGLE_CLIENT_SECRET: z.string().default(""),
@@ -39,21 +48,43 @@ const envSchema = z
     SLACK_WEBHOOK_URL: z.string().url().optional(),
   })
   .superRefine((data, ctx) => {
-    if (isAuthBypassed()) return;
+    const resolved = pickAuthSecret(data);
+    if (resolved.length < 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Set NEXTAUTH_SECRET or AUTH_SECRET (min 32 characters)",
+        path: ["NEXTAUTH_SECRET"],
+      });
+    }
+
+    const bypass = isAuthBypassedFromEnvFields({
+      PUBLIC_APP_NO_AUTH: data.PUBLIC_APP_NO_AUTH,
+      NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: data.NEXT_PUBLIC_PUBLIC_APP_NO_AUTH,
+      DISABLE_AUTH: data.DISABLE_AUTH,
+      NODE_ENV: data.NODE_ENV,
+    });
+    if (bypass) return;
+
     if (!data.GOOGLE_CLIENT_ID.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "GOOGLE_CLIENT_ID is required when sign-in is enabled (or enable PUBLIC_APP_NO_AUTH for no-login mode)",
+        message:
+          "GOOGLE_CLIENT_ID is required when sign-in is enabled (or enable PUBLIC_APP_NO_AUTH for no-login mode)",
         path: ["GOOGLE_CLIENT_ID"],
       });
     }
     if (!data.GOOGLE_CLIENT_SECRET.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "GOOGLE_CLIENT_SECRET is required when sign-in is enabled (or enable PUBLIC_APP_NO_AUTH for no-login mode)",
+        message:
+          "GOOGLE_CLIENT_SECRET is required when sign-in is enabled (or enable PUBLIC_APP_NO_AUTH for no-login mode)",
         path: ["GOOGLE_CLIENT_SECRET"],
       });
     }
+  })
+  .transform((data) => {
+    const resolved = pickAuthSecret(data);
+    return { ...data, NEXTAUTH_SECRET: resolved };
   });
 
 export type Env = z.infer<typeof envSchema>;

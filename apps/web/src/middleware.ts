@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { isAuthBypassed } from "@/shared/lib/auth-bypass";
+import { getEnv } from "@/shared/validations/env";
 
 const protectedPrefixes = ["/dashboard", "/links", "/campaigns", "/analytics", "/utm", "/settings"];
 
@@ -14,7 +15,7 @@ export async function middleware(req: NextRequest) {
 
   const token = await getToken({
     req,
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    secret: getEnv().NEXTAUTH_SECRET,
     secureCookie: process.env.NODE_ENV === "production",
   });
 
