@@ -3,7 +3,8 @@
  *
  * **Open access (no login):** set `PUBLIC_APP_NO_AUTH=true` and/or
  * `NEXT_PUBLIC_PUBLIC_APP_NO_AUTH=true` (see `.env.example`). Defaults are **off**
- * so production never accidentally skips sign-in.
+ * so production never accidentally skips sign-in. In this mode **Google OAuth is
+ * not used** — leave `GOOGLE_*` empty.
  *
  * **Local dev only:** `DISABLE_AUTH=true` with `NODE_ENV=development` still bypasses
  * Google OAuth without setting the public flags above.

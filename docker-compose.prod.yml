@@ -17,9 +17,11 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
       REDIS_URL: redis://redis:6379
       NEXTAUTH_URL: ${NEXTAUTH_URL}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Either host env var works; mirror into both names so Auth.js never sees MissingSecret.
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-${AUTH_SECRET}}
+      AUTH_SECRET: ${AUTH_SECRET:-${NEXTAUTH_SECRET}}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL}
       SHORT_LINK_HOST: ${SHORT_LINK_HOST:-go.driffle.com}
       NEXT_PUBLIC_SHORT_LINK_HOST: ${NEXT_PUBLIC_SHORT_LINK_HOST:-go.driffle.com}
