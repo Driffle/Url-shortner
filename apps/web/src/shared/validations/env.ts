@@ -26,6 +26,20 @@ const envSchema = z
       .min(1)
       .refine((s) => s.startsWith("postgresql://") || s.startsWith("postgres://"), "Must be a PostgreSQL URL"),
     REDIS_URL: z.string().min(1),
+    /**
+     * First segment of Redis keys (default `dl`). Managed Redis ACLs often restrict key names;
+     * set this to the prefix your user is allowed to use (e.g. `app_driffle_url_shortner`).
+     */
+    REDIS_KEY_PREFIX: z.preprocess(
+      emptyEnvToUndefined,
+      z
+        .string()
+        .min(1)
+        .max(128)
+        .regex(/^[a-zA-Z0-9_-]+$/, "REDIS_KEY_PREFIX: use letters, digits, underscore, hyphen only")
+        .optional()
+        .default("dl"),
+    ),
 
     NEXTAUTH_URL: z.string().url(),
     /** Legacy name; use either this or `AUTH_SECRET` (32+ chars). Output is normalized in `transform`. */

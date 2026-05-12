@@ -52,6 +52,7 @@ Omit them or set to `false` to require Google OAuth. Local-only bypass: `DISABLE
 |----------|----------|----------------|
 | `DATABASE_URL` | Yes | Prisma / Postgres connection string |
 | `REDIS_URL` | Yes | Short-link cache, rate limits, click feed |
+| `REDIS_KEY_PREFIX` | Optional | Defaults to `dl`. **Managed Redis (ACL):** set to the key namespace your user may use (e.g. `app_driffle_url_shortner`). All keys are `{prefix}:…`. |
 | `NEXTAUTH_URL` | Yes | Must match how you open the app (e.g. `http://127.0.0.1:3000`) |
 | `NEXTAUTH_SECRET` or `AUTH_SECRET` | Yes | **≥ 32 characters** (same value in both is fine). Auth.js v5 reads `AUTH_SECRET`; this app accepts either name. |
 | `GOOGLE_CLIENT_ID` | Yes† | Google OAuth Web client ID |
@@ -116,7 +117,7 @@ Open **http://127.0.0.1:3000** (matches the default dev script hostname).
 
 3. **Schema on Postgres:** the production image runs **`npx prisma db push`** once on container start (before `next start`) so tables such as `User` exist on a fresh volume. To skip that (e.g. you run `prisma migrate deploy` from CI or a job), set **`SKIP_PRISMA_PUSH=1`** in `.env`. If you later add SQL migrations under `prisma/migrations`, prefer **`migrate deploy`** instead of `db push` and use `SKIP_PRISMA_PUSH=1` plus a migration step.
 
-Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`db`** and **`redis`** — see `.env.example`.
+Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`db`** and **`redis`** — see `.env.example`. Set **`REDIS_KEY_PREFIX`** if your Redis ACL only allows a specific key prefix.
 
 ---
 
@@ -124,6 +125,8 @@ Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`d
 
 | Symptom | Likely fix |
 |---------|------------|
+| Redis `NOPERM` / “no permissions to run the `info` command” | The app disables ioredis **ready check** (no `INFO`). If you still see **`NOPERM` on keys**, set **`REDIS_KEY_PREFIX`** in `.env` to the prefix your ACL allows (must match pattern such as `~{prefix}:*`). |
+| Short links return **404** / redirect never runs | Often Redis errors during rate limit or slug cache — fix Redis ACL / prefix first; then confirm the slug exists in the DB. |
 | `Invalid environment` on first Redis/redirect use | Missing or short auth secret (32+ chars), bad URLs, or — if **sign-in is on** — empty `GOOGLE_*`. With no-login flags set, `GOOGLE_*` may be empty. |
 | `[auth][error] MissingSecret` in Docker / production logs | Set **`NEXTAUTH_SECRET`** or **`AUTH_SECRET`** (32+ random chars) on the container. Open-access mode still loads NextAuth for `/api/auth/session` — the secret is required. With Compose, set one in root `.env`; `docker-compose.prod.yml` mirrors it into both env names. |
 | `The table public.User does not exist` (Prisma `P2021`) | Fresh DB with no schema: rebuild/restart the **`web`** image so startup runs `prisma db push`, or run `docker compose ... exec web npx prisma db push` once. If you set **`SKIP_PRISMA_PUSH=1`**, apply migrations / push yourself. |

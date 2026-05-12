@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 /**
  * Deployer / cron should POST on a schedule.
- * V2: recompute uniqueVisitors per bucket, campaign-level rollups, backfill from `dl:queue:clicks`.
+ * V2: recompute uniqueVisitors per bucket, campaign-level rollups, backfill from the Redis click queue.
  */
 export async function POST(req: Request) {
   const secret = process.env.CRON_SECRET;

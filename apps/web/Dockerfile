@@ -16,6 +16,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # `next build` loads server modules (e.g. NextAuth) that call `getEnv()` — same placeholders as CI.
 # Runtime env comes from compose/Kubernetes and replaces these; they are not copied to the final stage.
 ENV REDIS_URL=redis://127.0.0.1:6379
+ENV REDIS_KEY_PREFIX=dl
 ENV NEXTAUTH_URL=http://127.0.0.1:3000
 ENV PUBLIC_APP_URL=http://127.0.0.1:3000
 ENV NEXTAUTH_SECRET=01234567890123456789012345678901
