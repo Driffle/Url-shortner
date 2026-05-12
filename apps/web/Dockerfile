@@ -39,6 +39,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
+RUN chmod +x ./scripts/docker-entrypoint.sh && chown nextjs:nodejs ./scripts/docker-entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
@@ -48,4 +50,4 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["npm", "run", "start"]
+CMD ["./scripts/docker-entrypoint.sh"]

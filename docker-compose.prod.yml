@@ -31,6 +31,8 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       PUBLIC_APP_NO_AUTH: ${PUBLIC_APP_NO_AUTH:-}
       NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: ${NEXT_PUBLIC_PUBLIC_APP_NO_AUTH:-}
+      # Set to 1 only if you apply schema yourself (e.g. prisma migrate deploy elsewhere).
+      SKIP_PRISMA_PUSH: ${SKIP_PRISMA_PUSH:-}
     depends_on:
       db:
         condition: service_healthy
