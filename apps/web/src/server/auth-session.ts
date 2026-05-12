@@ -1,4 +1,5 @@
 import type { Session } from "next-auth";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/server/db/prisma";
 import { isAuthBypassed } from "@/shared/lib/auth-bypass";
@@ -28,16 +29,25 @@ function placeholderBypassSession(): Session {
 }
 
 async function ensureLocalDevUser() {
-  return prisma.user.upsert({
-    where: { email: LOCAL_DEV_EMAIL },
-    create: {
-      email: LOCAL_DEV_EMAIL,
-      name: "Local Dev",
-      role: "ADMIN",
-      emailVerified: new Date(),
-    },
-    update: {},
-  });
+  const existing = await prisma.user.findUnique({ where: { email: LOCAL_DEV_EMAIL } });
+  if (existing) return existing;
+  try {
+    return await prisma.user.create({
+      data: {
+        email: LOCAL_DEV_EMAIL,
+        name: "Local Dev",
+        role: "ADMIN",
+        emailVerified: new Date(),
+      },
+    });
+  } catch (e) {
+    // Concurrent first requests can both try create; second hits unique on `email`.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const row = await prisma.user.findUnique({ where: { email: LOCAL_DEV_EMAIL } });
+      if (row) return row;
+    }
+    throw e;
+  }
 }
 
 /**
