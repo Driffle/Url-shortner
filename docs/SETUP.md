@@ -53,9 +53,9 @@ Omit them or set to `false` to require Google OAuth. Local-only bypass: `DISABLE
 | `DATABASE_URL` | Yes | Prisma / Postgres connection string |
 | `REDIS_URL` | Yes | Short-link cache, rate limits, click feed |
 | `NEXTAUTH_URL` | Yes | Must match how you open the app (e.g. `http://127.0.0.1:3000`) |
-| `NEXTAUTH_SECRET` | Yes | **≥ 32 characters**, random string ([generate one](https://generate-secret.vercel.app/32)) |
-| `GOOGLE_CLIENT_ID` | Yes* | Google OAuth Web client ID |
-| `GOOGLE_CLIENT_SECRET` | Yes* | Google OAuth client secret |
+| `NEXTAUTH_SECRET` or `AUTH_SECRET` | Yes | **≥ 32 characters** (same value in both is fine). Auth.js v5 reads `AUTH_SECRET`; this app accepts either name. |
+| `GOOGLE_CLIENT_ID` | Yes† | Google OAuth Web client ID |
+| `GOOGLE_CLIENT_SECRET` | Yes† | Google OAuth client secret |
 | `PUBLIC_APP_URL` | Yes | Usually same as `NEXTAUTH_URL` for local |
 | `SHORT_LINK_HOST` | Yes | Host shown in UI for short links (e.g. `localhost:3000` locally) |
 | `NEXT_PUBLIC_SHORT_LINK_HOST` | Optional | Same as `SHORT_LINK_HOST` if you want the browser to show it |
@@ -64,9 +64,11 @@ Omit them or set to `false` to require Google OAuth. Local-only bypass: `DISABLE
 | `DISABLE_AUTH` | Optional | `true` + `npm run dev` only — skips Google (see below) |
 | `NEXT_PUBLIC_DISABLE_AUTH` | Optional | `true` with `DISABLE_AUTH` — shows “local dev” hint in menu |
 
-\*If you use **`DISABLE_AUTH=true`**, you can keep placeholder non-empty values for Google (the app does not call Google until you turn auth back on).
+† **Not required** when the app runs **without sign-in**: set `PUBLIC_APP_NO_AUTH` + `NEXT_PUBLIC_PUBLIC_APP_NO_AUTH`, or use **`DISABLE_AUTH=true`** in development only (see below). In those modes you may leave `GOOGLE_*` empty and the Google provider is not registered.
 
-### Step D — Google OAuth (real sign-in)
+### Step D — Google OAuth (only when you want @domain Google sign-in)
+
+Skip this section if you use **public no-auth** (`PUBLIC_APP_NO_AUTH`) or local **`DISABLE_AUTH`** and do not want Google yet.
 
 1. [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → **Create credentials** → **OAuth client ID** → Application type **Web application**.
 2. **Authorized JavaScript origins**: `http://127.0.0.1:3000` (and your production URL later).
@@ -126,7 +128,8 @@ Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`d
 
 | Symptom | Likely fix |
 |---------|------------|
-| `Invalid environment` on first Redis/redirect use | Missing or short `NEXTAUTH_SECRET` (need 32+ chars), empty Google vars, or bad URLs in `.env.local` |
+| `Invalid environment` on first Redis/redirect use | Missing or short auth secret (32+ chars), bad URLs, or — if **sign-in is on** — empty `GOOGLE_*`. With no-login flags set, `GOOGLE_*` may be empty. |
+| `[auth][error] MissingSecret` in Docker / production logs | Set **`NEXTAUTH_SECRET`** or **`AUTH_SECRET`** (32+ random chars) on the container. Open-access mode still loads NextAuth for `/api/auth/session` — the secret is required. With Compose, set one in root `.env`; `docker-compose.prod.yml` mirrors it into both env names. |
 | `DATABASE_URL` not found for Prisma | Add `DATABASE_URL` to **`apps/web/.env`** |
 | Cannot sign in with Google | Redirect URI mismatch, wrong `NEXTAUTH_URL`, or email not `@driffle.com` |
 | Port 3000 in use | Stop other process or set `PORT=3001 npm run dev` |

@@ -1,6 +1,6 @@
 /**
- * NextAuth (Google) — still registered for `/api/auth/*`, but the app layer may bypass
- * sign-in when `PUBLIC_APP_NO_AUTH` / `NEXT_PUBLIC_PUBLIC_APP_NO_AUTH` env is set (see `src/shared/lib/auth-bypass.ts`).
+ * NextAuth — Google provider is registered only when sign-in is required and `GOOGLE_*` are set.
+ * No-login mode: `PUBLIC_APP_NO_AUTH` / `NEXT_PUBLIC_PUBLIC_APP_NO_AUTH` or local `DISABLE_AUTH` (see `auth-bypass.ts`).
  */
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -11,6 +11,7 @@ import { authConfig } from "@/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  secret: getEnv().NEXTAUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   callbacks: {
