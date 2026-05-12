@@ -27,6 +27,8 @@ services:
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       CRON_SECRET: ${CRON_SECRET:-}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      PUBLIC_APP_NO_AUTH: ${PUBLIC_APP_NO_AUTH:-}
+      NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: ${NEXT_PUBLIC_PUBLIC_APP_NO_AUTH:-}
     depends_on:
       db:
         condition: service_healthy

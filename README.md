@@ -7,6 +7,8 @@ Internal link management and campaign attribution for Driffle: short URLs, UTM b
 - **App:** Next.js 15 (App Router), TypeScript, Tailwind CSS, Prisma, Redis, NextAuth (Google, `@driffle.com` only)
 - **Infra:** Docker Compose (web + PostgreSQL + Redis)
 
+**Setup & environment variables:** see **[docs/SETUP.md](docs/SETUP.md)** (local `.env.local` + `.env`, Google OAuth, optional auth bypass, Docker env).
+
 ## Quick start (local)
 
 1. **Dependencies:** Node 22+, Docker Desktop

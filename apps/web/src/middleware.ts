@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { isLocalAuthDisabled } from "@/shared/lib/auth-bypass";
+import { isAuthBypassed } from "@/shared/lib/auth-bypass";
 
 const protectedPrefixes = ["/dashboard", "/links", "/campaigns", "/analytics", "/utm", "/settings"];
 
@@ -10,7 +10,7 @@ export async function middleware(req: NextRequest) {
   const isProtected = protectedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!isProtected) return NextResponse.next();
 
-  if (isLocalAuthDisabled()) return NextResponse.next();
+  if (isAuthBypassed()) return NextResponse.next();
 
   const token = await getToken({
     req,
