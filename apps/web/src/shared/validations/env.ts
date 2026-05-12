@@ -18,6 +18,14 @@ function pickAuthSecret(data: { AUTH_SECRET?: string | undefined; NEXTAUTH_SECRE
   return "";
 }
 
+/** Trim Redis key prefix; empty string → unset (use default `dl`). */
+function redisPrefixPreprocess(v: unknown): unknown {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -31,12 +39,12 @@ const envSchema = z
      * set this to the prefix your user is allowed to use (e.g. `app_driffle_url_shortner`).
      */
     REDIS_KEY_PREFIX: z.preprocess(
-      emptyEnvToUndefined,
+      redisPrefixPreprocess,
       z
         .string()
         .min(1)
-        .max(128)
-        .regex(/^[a-zA-Z0-9_-]+$/, "REDIS_KEY_PREFIX: use letters, digits, underscore, hyphen only")
+        .max(256)
+        .regex(/^[^\s\r\n\x00]+$/, "REDIS_KEY_PREFIX must not contain whitespace or null bytes")
         .optional()
         .default("dl"),
     ),
