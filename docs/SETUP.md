@@ -114,11 +114,7 @@ Open **http://127.0.0.1:3000** (matches the default dev script hostname).
    docker compose -f docker-compose.prod.yml up -d
    ```
 
-3. Run migrations (or first-time `db push` if you have no migrations yet):
-
-   ```bash
-   docker compose -f docker-compose.prod.yml exec web npx prisma migrate deploy
-   ```
+3. **Schema on Postgres:** the production image runs **`npx prisma db push`** once on container start (before `next start`) so tables such as `User` exist on a fresh volume. To skip that (e.g. you run `prisma migrate deploy` from CI or a job), set **`SKIP_PRISMA_PUSH=1`** in `.env`. If you later add SQL migrations under `prisma/migrations`, prefer **`migrate deploy`** instead of `db push` and use `SKIP_PRISMA_PUSH=1` plus a migration step.
 
 Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`db`** and **`redis`** — see `.env.example`.
 
@@ -130,7 +126,7 @@ Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`d
 |---------|------------|
 | `Invalid environment` on first Redis/redirect use | Missing or short auth secret (32+ chars), bad URLs, or — if **sign-in is on** — empty `GOOGLE_*`. With no-login flags set, `GOOGLE_*` may be empty. |
 | `[auth][error] MissingSecret` in Docker / production logs | Set **`NEXTAUTH_SECRET`** or **`AUTH_SECRET`** (32+ random chars) on the container. Open-access mode still loads NextAuth for `/api/auth/session` — the secret is required. With Compose, set one in root `.env`; `docker-compose.prod.yml` mirrors it into both env names. |
-| `DATABASE_URL` not found for Prisma | Add `DATABASE_URL` to **`apps/web/.env`** |
+| `The table public.User does not exist` (Prisma `P2021`) | Fresh DB with no schema: rebuild/restart the **`web`** image so startup runs `prisma db push`, or run `docker compose ... exec web npx prisma db push` once. If you set **`SKIP_PRISMA_PUSH=1`**, apply migrations / push yourself. |
 | Cannot sign in with Google | Redirect URI mismatch, wrong `NEXTAUTH_URL`, or email not `@driffle.com` |
 | Port 3000 in use | Stop other process or set `PORT=3001 npm run dev` |
 
