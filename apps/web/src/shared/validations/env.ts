@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { isAuthBypassedFromEnvFields } from "@/shared/lib/auth-bypass";
 
+/** Compose / Deployer often set `VAR=` (empty). Treat as unset for optional fields. */
+function emptyEnvToUndefined(v: unknown): unknown {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "string") return v;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
 /** Picks the first 32+ character value from `AUTH_SECRET` or `NEXTAUTH_SECRET`, or empty string. */
 function pickAuthSecret(data: { AUTH_SECRET?: string | undefined; NEXTAUTH_SECRET?: string | undefined }): string {
   const a = (data.AUTH_SECRET ?? "").trim();
@@ -39,13 +47,13 @@ const envSchema = z
     PUBLIC_APP_URL: z.string().url(),
     SHORT_LINK_HOST: z.string().min(1).default("go.driffle.com"),
     /** Exposed to browser for display (optional; falls back to SHORT_LINK_HOST server-side). */
-    NEXT_PUBLIC_SHORT_LINK_HOST: z.string().min(1).optional(),
+    NEXT_PUBLIC_SHORT_LINK_HOST: z.preprocess(emptyEnvToUndefined, z.string().min(1).optional()),
 
     // Optional: internal API for click ingestion HMAC
-    INTERNAL_CLICK_SECRET: z.string().min(16).optional(),
+    INTERNAL_CLICK_SECRET: z.preprocess(emptyEnvToUndefined, z.string().min(16).optional()),
 
     // Slack (architecture hook; optional at runtime)
-    SLACK_WEBHOOK_URL: z.string().url().optional(),
+    SLACK_WEBHOOK_URL: z.preprocess(emptyEnvToUndefined, z.string().url().optional()),
   })
   .superRefine((data, ctx) => {
     const resolved = pickAuthSecret(data);
