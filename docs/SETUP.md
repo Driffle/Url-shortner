@@ -52,7 +52,7 @@ Omit them or set to `false` to require Google OAuth. Local-only bypass: `DISABLE
 |----------|----------|----------------|
 | `DATABASE_URL` | Yes | Prisma / Postgres connection string |
 | `REDIS_URL` | Yes | Short-link cache, rate limits, click feed |
-| `REDIS_KEY_PREFIX` | Optional | Defaults to `dl`. **Managed Redis (ACL):** set to the key namespace your user may use (e.g. `app_driffle_url_shortner`). All keys are `{prefix}:…`. |
+| `REDIS_KEY_PREFIX` | Optional | Defaults to `dl`. **Managed Redis (ACL):** set to the key namespace your user may use. Any non-empty string without whitespace is allowed (e.g. `app_driffle_url_shortner`, `app:driffle:shortner`). Keys are `{prefix}:…`. |
 | `NEXTAUTH_URL` | Yes | Must match how you open the app (e.g. `http://127.0.0.1:3000`) |
 | `NEXTAUTH_SECRET` or `AUTH_SECRET` | Yes | **≥ 32 characters** (same value in both is fine). Auth.js v5 reads `AUTH_SECRET`; this app accepts either name. |
 | `GOOGLE_CLIENT_ID` | Yes† | Google OAuth Web client ID |
@@ -125,7 +125,7 @@ Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`d
 
 | Symptom | Likely fix |
 |---------|------------|
-| Redis `NOPERM` / “no permissions to run the `info` command” | The app disables ioredis **ready check** (no `INFO`). If you still see **`NOPERM` on keys**, set **`REDIS_KEY_PREFIX`** in `.env` to the prefix your ACL allows (must match pattern such as `~{prefix}:*`). |
+| Redis `NOPERM` / “no permissions to run the `info` command” | The app disables ioredis **ready check** (no `INFO`). If you still see **`NOPERM` on keys**, set **`REDIS_KEY_PREFIX`** in `.env` to the prefix your ACL allows (must match pattern such as `~{prefix}:*`). Value may include `.`, `:`, `@`, etc.; only whitespace is rejected. |
 | Short links return **404** / redirect never runs | Often Redis errors during rate limit or slug cache — fix Redis ACL / prefix first; then confirm the slug exists in the DB. |
 | `Invalid environment` on first Redis/redirect use | Missing or short auth secret (32+ chars), bad URLs, or — if **sign-in is on** — empty `GOOGLE_*`. With no-login flags set, `GOOGLE_*` may be empty. |
 | `[auth][error] MissingSecret` in Docker / production logs | Set **`NEXTAUTH_SECRET`** or **`AUTH_SECRET`** (32+ random chars) on the container. Open-access mode still loads NextAuth for `/api/auth/session` — the secret is required. With Compose, set one in root `.env`; `docker-compose.prod.yml` mirrors it into both env names. |
