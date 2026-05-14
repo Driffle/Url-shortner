@@ -1,5 +1,6 @@
 /**
- * NextAuth — Google provider is registered only when sign-in is required and `GOOGLE_*` are set.
+ * NextAuth — Google when `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` are set and `DISABLE_GOOGLE_AUTH` is off
+ * (typical Driffle production); otherwise email/password for @driffle.com (`user:set-password`).
  * No-login mode: `PUBLIC_APP_NO_AUTH` / `NEXT_PUBLIC_PUBLIC_APP_NO_AUTH` or local `DISABLE_AUTH` (see `auth-bypass.ts`).
  */
 import NextAuth from "next-auth";
@@ -15,32 +16,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   callbacks: {
-    async signIn({ user, profile }) {
+    async signIn({ user, profile, account }) {
       const domain = getEnv().ALLOWED_EMAIL_DOMAIN.toLowerCase();
-      const email = (user.email ?? profile?.email)?.toLowerCase();
+      const email =
+        account?.provider === "credentials"
+          ? user.email?.toLowerCase()
+          : (user.email ?? profile?.email)?.toLowerCase();
       if (!email || !email.endsWith(`@${domain}`)) return "/login?error=Domain";
       return true;
     },
-    async jwt({ token, user, trigger }) {
-      if (user?.id) {
+    async jwt({ token, user }) {
+      const id = user?.id ?? token.sub;
+      if (id) {
         const u = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id },
           select: { role: true },
         });
-        token.role = u?.role ?? "VIEWER";
-      }
-      if (trigger === "update" && token.sub) {
-        const u = await prisma.user.findUnique({
-          where: { id: token.sub },
-          select: { role: true },
-        });
-        if (u) token.role = u.role;
+        token.role = u?.role ?? "EDITOR";
       }
       return token;
     },
     async session({ session, token }) {
       if (token.sub) session.user.id = token.sub;
-      if (token.role) session.user.role = token.role as UserRole;
+      session.user.role = (token.role as UserRole | undefined) ?? "EDITOR";
       return session;
     },
   },

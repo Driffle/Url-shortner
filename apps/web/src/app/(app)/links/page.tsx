@@ -18,7 +18,10 @@ export default async function LinksPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Links</h1>
-          <p className="text-muted-foreground">Copy the full short URL below (includes https and /r/).</p>
+          <p className="text-muted-foreground">
+            Copy the tracked short URL (includes https and /go/). Instant redirect without a visit count: replace{" "}
+            <span className="font-mono">/go/</span> with <span className="font-mono">/r/</span> in the same host.
+          </p>
         </div>
         <Button asChild>
           <Link href="/links/new">Create link</Link>
@@ -46,6 +49,7 @@ export default async function LinksPage() {
                     <th className="pb-2 pr-4 font-medium">Destination</th>
                     <th className="pb-2 pr-4 font-medium">Campaign</th>
                     <th className="pb-2 pr-4 font-medium">Clicks</th>
+                    <th className="pb-2 pr-4 font-medium">Visits</th>
                     <th className="pb-2 pr-4 font-medium">Status</th>
                     <th className="pb-2 font-medium"> </th>
                   </tr>
@@ -66,6 +70,7 @@ export default async function LinksPage() {
                       <td className="max-w-xs truncate py-3 pr-4 text-muted-foreground">{l.destinationUrl}</td>
                       <td className="py-3 pr-4">{l.campaign?.name ?? "—"}</td>
                       <td className="py-3 pr-4">{l.clickCount.toLocaleString()}</td>
+                      <td className="py-3 pr-4">{l.visitCount.toLocaleString()}</td>
                       <td className="py-3 pr-4">{l.status}</td>
                       <td className="py-3">
                         <Button variant="outline" size="sm" asChild>

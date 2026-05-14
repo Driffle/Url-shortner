@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/sha
 import { ClickTrendChart } from "@/features/analytics/components/click-trend-chart";
 import { Button } from "@/shared/ui/button";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
+import { getEnv } from "@/shared/validations/env";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ export default async function AnalyticsPage({
   const filteredLink = slug
     ? await prisma.link.findUnique({
         where: { slug },
-        select: { id: true, slug: true, destinationUrl: true, clickCount: true },
+        select: { id: true, slug: true, destinationUrl: true, clickCount: true, visitCount: true },
       })
     : null;
 
@@ -119,7 +120,10 @@ export default async function AnalyticsPage({
         <Card>
           <CardHeader>
             <CardTitle>Selected short URL</CardTitle>
-            <CardDescription>Use this exact URL in browsers and campaigns.</CardDescription>
+            <CardDescription>
+              Use this exact URL in browsers and campaigns. Visits are counted after {getEnv().VISIT_HOLD_SECONDS}s on the
+              interstitial page, then the user is sent to the destination.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p className="break-all font-mono text-base font-medium text-primary">{publicShortUrl(filteredLink.slug)}</p>
@@ -130,6 +134,9 @@ export default async function AnalyticsPage({
             <p className="text-muted-foreground">
               Lifetime clicks (counter):{" "}
               <span className="font-medium text-foreground">{filteredLink.clickCount.toLocaleString()}</span>
+              {" · "}
+              Visits (completed {getEnv().VISIT_HOLD_SECONDS}s dwell on /go/…):{" "}
+              <span className="font-medium text-foreground">{filteredLink.visitCount.toLocaleString()}</span>
               {" · "}
               Non-bot clicks in last 30 days:{" "}
               <span className="font-medium text-foreground">{windowClicks.toLocaleString()}</span>

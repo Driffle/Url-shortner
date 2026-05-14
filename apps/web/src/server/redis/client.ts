@@ -28,6 +28,7 @@ export const RedisKeys = {
   analyticsSummary: (linkId: string, range: string) => redisKey(`analytics:link:${linkId}:${range}`),
   rateLimitIp: (ip: string, window: string) => redisKey(`rl:ip:${ip}:${window}`),
   rateLimitSlug: (slug: string, window: string) => redisKey(`rl:slug:${slug}:${window}`),
+  rateLimitVisitPost: (ip: string, window: string) => redisKey(`rl:visitpost:${ip}:${window}`),
   clickFeed: () => redisKey("feed:clicks"),
   clickQueue: () => redisKey("queue:clicks"),
 } as const;
