@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/server/db/prisma";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { publicShortUrl } from "@/shared/lib/short-link-url";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +13,12 @@ export default async function LinksPage() {
     include: { campaign: { select: { name: true } } },
   });
 
-  const host = process.env.SHORT_LINK_HOST ?? "go.driffle.com";
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Links</h1>
-          <p className="text-muted-foreground">Short URLs resolve at {host}</p>
+          <p className="text-muted-foreground">Copy the full short URL below (includes https and /r/).</p>
         </div>
         <Button asChild>
           <Link href="/links/new">Create link</Link>
@@ -43,24 +42,36 @@ export default async function LinksPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b text-muted-foreground">
-                    <th className="pb-2 pr-4 font-medium">Short</th>
+                    <th className="pb-2 pr-4 font-medium">Short URL</th>
                     <th className="pb-2 pr-4 font-medium">Destination</th>
                     <th className="pb-2 pr-4 font-medium">Campaign</th>
                     <th className="pb-2 pr-4 font-medium">Clicks</th>
-                    <th className="pb-2 font-medium">Status</th>
+                    <th className="pb-2 pr-4 font-medium">Status</th>
+                    <th className="pb-2 font-medium"> </th>
                   </tr>
                 </thead>
                 <tbody>
                   {links.map((l) => (
                     <tr key={l.id} className="border-b last:border-0">
-                      <td className="py-3 pr-4 font-mono text-xs">
-                        <span className="text-primary">{host}/</span>
-                        {l.slug}
+                      <td className="py-3 pr-4">
+                        <a
+                          href={publicShortUrl(l.slug)}
+                          className="break-all font-mono text-xs text-primary underline-offset-2 hover:underline"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {publicShortUrl(l.slug)}
+                        </a>
                       </td>
                       <td className="max-w-xs truncate py-3 pr-4 text-muted-foreground">{l.destinationUrl}</td>
                       <td className="py-3 pr-4">{l.campaign?.name ?? "—"}</td>
                       <td className="py-3 pr-4">{l.clickCount.toLocaleString()}</td>
-                      <td className="py-3">{l.status}</td>
+                      <td className="py-3 pr-4">{l.status}</td>
+                      <td className="py-3">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/analytics?slug=${encodeURIComponent(l.slug)}`}>Analytics</Link>
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
