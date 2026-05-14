@@ -54,23 +54,31 @@ async function ensureLocalDevUser() {
  * Use instead of `auth()` everywhere the app needs the current session.
  * When auth is bypassed (public env flags or `DISABLE_AUTH` in dev), returns a
  * synthetic ADMIN session backed by a real `User` row (required for FKs such as `Link.createdById`).
+ *
+ * On failure (DB down, misconfigured auth, etc.) logs the error and returns `null` so the root
+ * layout can still render instead of a production-only digest crash.
  */
 export async function getAppSession(): Promise<Session | null> {
-  if (isAuthBypassed()) {
-    if (shouldSkipDbForBypassSession()) {
-      return placeholderBypassSession();
+  try {
+    if (isAuthBypassed()) {
+      if (shouldSkipDbForBypassSession()) {
+        return placeholderBypassSession();
+      }
+      const user = await ensureLocalDevUser();
+      return {
+        user: {
+          id: user.id,
+          email: user.email!,
+          name: user.name ?? "Local Dev",
+          image: user.image,
+          role: user.role,
+        },
+        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      };
     }
-    const user = await ensureLocalDevUser();
-    return {
-      user: {
-        id: user.id,
-        email: user.email!,
-        name: user.name ?? "Local Dev",
-        image: user.image,
-        role: user.role,
-      },
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    };
+    return await auth();
+  } catch (err) {
+    console.error("[getAppSession] failed — check DATABASE_URL, NEXTAUTH_SECRET, and Prisma schema vs DB", err);
+    return null;
   }
-  return auth();
 }

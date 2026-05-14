@@ -70,7 +70,9 @@ export function CreateLinkForm({
           <div className="space-y-2">
             <Label htmlFor="customSlug">Custom slug (optional)</Label>
             <Input id="customSlug" name="customSlug" placeholder="spring-sale" />
-            <p className="text-xs text-muted-foreground">Leave blank for an auto-generated slug. Live URL: {host}/…</p>
+            <p className="text-xs text-muted-foreground">
+              {`Tracked short URL: https://${host}/go/<slug> — instant redirect (no visit count): https://${host}/r/<slug>.`}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="campaignId">Campaign</Label>

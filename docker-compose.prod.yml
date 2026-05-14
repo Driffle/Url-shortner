@@ -18,11 +18,18 @@ services:
       REDIS_URL: redis://redis:6379
       REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-dl}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
+      # Auth.js v5 reads AUTH_URL for OAuth redirect_uri; default to NEXTAUTH_URL so it matches Google Console.
+      AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL}}
       # Mirror host values into both names when at least one is set; if neither is set, both are empty and Auth.js will error — set one in `.env`.
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-${AUTH_SECRET}}
       AUTH_SECRET: ${AUTH_SECRET:-${NEXTAUTH_SECRET}}
+      # Google OAuth for @driffle.com (recommended prod): set both from your secret store.
+      # Google Cloud Console → OAuth client → Authorized redirect URI (same scheme + host as NEXTAUTH_URL), e.g.:
+      #   https://shortly.driffle.net/api/auth/callback/google
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # Leave unset so Google is used when GOOGLE_* are set. Set to 1 only to force password-only login.
+      DISABLE_GOOGLE_AUTH: ${DISABLE_GOOGLE_AUTH:-}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL}
       SHORT_LINK_HOST: ${SHORT_LINK_HOST:-go.driffle.com}
       NEXT_PUBLIC_SHORT_LINK_HOST: ${NEXT_PUBLIC_SHORT_LINK_HOST:-go.driffle.com}

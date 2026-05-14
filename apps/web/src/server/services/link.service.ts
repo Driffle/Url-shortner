@@ -9,7 +9,11 @@ import { can, Permissions } from "@/shared/lib/rbac";
 
 export class LinkService {
   async createLink(actorId: string, role: UserRole, raw: unknown): Promise<Link> {
-    if (!can(role, Permissions.editLinks)) throw new Error("Forbidden");
+    if (!can(role, Permissions.editLinks)) {
+      throw new Error(
+        "Your role is Viewer, which cannot create links. Ask an admin to change your account to Editor or Admin in the database (User.role).",
+      );
+    }
     const input = createLinkSchema.parse(raw);
     assertSafeDestination(input.destinationUrl);
 
@@ -61,7 +65,9 @@ export class LinkService {
   }
 
   async deleteLink(actorId: string, role: UserRole, linkId: string): Promise<void> {
-    if (!can(role, Permissions.deleteLinks)) throw new Error("Forbidden");
+    if (!can(role, Permissions.deleteLinks)) {
+      throw new Error("Only Admin accounts can delete links.");
+    }
     const link = await linkRepository.findById(linkId);
     if (!link) throw new Error("Not found");
     await linkRepository.delete(linkId);

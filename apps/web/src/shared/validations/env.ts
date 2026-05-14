@@ -18,6 +18,37 @@ function pickAuthSecret(data: { AUTH_SECRET?: string | undefined; NEXTAUTH_SECRE
   return "";
 }
 
+/** Trim, strip wrapping quotes; empty → undefined. If no `http(s)://`, add scheme (Deployer often omits it). */
+function normalizeHttpUrlInput(v: unknown): unknown {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "string") return v;
+  let t = v.trim().replace(/^['"]+|['"]+$/g, "");
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) {
+    t = stripTrailingSlashOnCanonicalOrigin(t);
+    return t;
+  }
+  const lower = t.toLowerCase();
+  if (lower.startsWith("localhost") || lower.startsWith("127.0.0.1")) {
+    return stripTrailingSlashOnCanonicalOrigin(`http://${t}`);
+  }
+  return stripTrailingSlashOnCanonicalOrigin(`https://${t}`);
+}
+
+/** `https://host/` → `https://host` so OAuth redirect URIs match Google Console entries (no stray slash). */
+function stripTrailingSlashOnCanonicalOrigin(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/\/+$/, "") || "";
+    if (path === "" || path === "/") {
+      return `${u.protocol}//${u.host}`;
+    }
+    return url;
+  } catch {
+    return url.replace(/\/+$/, "");
+  }
+}
+
 /** Trim Redis key prefix; empty string → unset (use default `dl`). */
 function redisPrefixPreprocess(v: unknown): unknown {
   if (v === undefined || v === null) return undefined;
@@ -49,7 +80,10 @@ const envSchema = z
         .default("dl"),
     ),
 
-    NEXTAUTH_URL: z.string().url(),
+    NEXTAUTH_URL: z.preprocess(
+      normalizeHttpUrlInput,
+      z.string().min(1, "Set NEXTAUTH_URL (e.g. https://shortly.driffle.net)").url({ message: "NEXTAUTH_URL must be a valid URL" }),
+    ),
     /** Legacy name; use either this or `AUTH_SECRET` (32+ chars). Output is normalized in `transform`. */
     NEXTAUTH_SECRET: z.string().optional(),
     /** Auth.js v5 name; either secret may be set. */
@@ -64,9 +98,18 @@ const envSchema = z
     GOOGLE_CLIENT_ID: z.string().default(""),
     GOOGLE_CLIENT_SECRET: z.string().default(""),
 
+    /** If set to 1/true/yes, Google provider is never registered (use when you need password-only despite GOOGLE_* in env). */
+    DISABLE_GOOGLE_AUTH: z.string().optional(),
+
+    /** Seconds to wait on `/go/[slug]` before counting a visit and redirecting (default 5). */
+    VISIT_HOLD_SECONDS: z.string().optional(),
+
     ALLOWED_EMAIL_DOMAIN: z.string().default("driffle.com"),
 
-    PUBLIC_APP_URL: z.string().url(),
+    PUBLIC_APP_URL: z.preprocess(
+      normalizeHttpUrlInput,
+      z.string().min(1, "Set PUBLIC_APP_URL (usually same origin as NEXTAUTH_URL)").url({ message: "PUBLIC_APP_URL must be a valid URL" }),
+    ),
     SHORT_LINK_HOST: z.string().min(1).default("go.driffle.com"),
     /** Exposed to browser for display (optional; falls back to SHORT_LINK_HOST server-side). */
     NEXT_PUBLIC_SHORT_LINK_HOST: z.preprocess(emptyEnvToUndefined, z.string().min(1).optional()),
@@ -95,26 +138,27 @@ const envSchema = z
     });
     if (bypass) return;
 
-    if (!data.GOOGLE_CLIENT_ID.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "GOOGLE_CLIENT_ID is required when sign-in is enabled (or enable PUBLIC_APP_NO_AUTH for no-login mode)",
-        path: ["GOOGLE_CLIENT_ID"],
-      });
-    }
-    if (!data.GOOGLE_CLIENT_SECRET.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "GOOGLE_CLIENT_SECRET is required when sign-in is enabled (or enable PUBLIC_APP_NO_AUTH for no-login mode)",
-        path: ["GOOGLE_CLIENT_SECRET"],
-      });
+    const googleDisabled = ["1", "true", "yes"].includes(
+      (data.DISABLE_GOOGLE_AUTH ?? "").trim().toLowerCase(),
+    );
+    const googleConfigured =
+      data.GOOGLE_CLIENT_ID.trim().length > 0 && data.GOOGLE_CLIENT_SECRET.trim().length > 0;
+    const useGoogle = googleConfigured && !googleDisabled;
+
+    if (!useGoogle) {
+      // Credentials-only mode: @driffle.com users provisioned with `npm run user:set-password`.
+      return;
     }
   })
   .transform((data) => {
     const resolved = pickAuthSecret(data);
-    return { ...data, NEXTAUTH_SECRET: resolved };
+    let visitHold = 5;
+    const raw = data.VISIT_HOLD_SECONDS?.trim();
+    if (raw) {
+      const n = parseInt(raw, 10);
+      if (!Number.isNaN(n)) visitHold = Math.min(120, Math.max(1, n));
+    }
+    return { ...data, NEXTAUTH_SECRET: resolved, VISIT_HOLD_SECONDS: visitHold };
   });
 
 export type Env = z.infer<typeof envSchema>;
@@ -123,7 +167,9 @@ function readEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     const msg = parsed.error.flatten().fieldErrors;
-    throw new Error(`Invalid environment: ${JSON.stringify(msg)}`);
+    const message = `Invalid environment: ${JSON.stringify(msg)}`;
+    console.error(message, parsed.error.issues);
+    throw new Error(message);
   }
   return parsed.data;
 }

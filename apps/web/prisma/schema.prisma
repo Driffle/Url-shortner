@@ -41,7 +41,10 @@ model User {
   emailVerified DateTime?
   name          String?
   image         String?
-  role          UserRole  @default(VIEWER)
+  /** Set via `npm run user:set-password` (credentials sign-in). Null = Google-only or not provisioned. */
+  passwordHash  String?   @db.Text
+  /** Default EDITOR so internal users can create links; use VIEWER for read-only accounts. */
+  role          UserRole  @default(EDITOR)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -125,6 +128,8 @@ model Link {
   status          LinkStatus @default(ACTIVE)
   createdById     String
   clickCount      Int        @default(0)
+  /** Counted when a user completes the /go/[slug] dwell (default 5s) before redirect. */
+  visitCount      Int        @default(0)
   uniqueClickEst  Int        @default(0) // HLL or bloom-backed estimate optional; MVP counter from rollups
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
