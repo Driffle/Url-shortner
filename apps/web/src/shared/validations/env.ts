@@ -18,6 +18,18 @@ function pickAuthSecret(data: { AUTH_SECRET?: string | undefined; NEXTAUTH_SECRE
   return "";
 }
 
+/** Trim, strip wrapping quotes; empty → undefined. If no `http(s)://`, add scheme (Deployer often omits it). */
+function normalizeHttpUrlInput(v: unknown): unknown {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "string") return v;
+  let t = v.trim().replace(/^['"]+|['"]+$/g, "");
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  const lower = t.toLowerCase();
+  if (lower.startsWith("localhost") || lower.startsWith("127.0.0.1")) return `http://${t}`;
+  return `https://${t}`;
+}
+
 /** Trim Redis key prefix; empty string → unset (use default `dl`). */
 function redisPrefixPreprocess(v: unknown): unknown {
   if (v === undefined || v === null) return undefined;
@@ -49,7 +61,10 @@ const envSchema = z
         .default("dl"),
     ),
 
-    NEXTAUTH_URL: z.string().url(),
+    NEXTAUTH_URL: z.preprocess(
+      normalizeHttpUrlInput,
+      z.string().min(1, "Set NEXTAUTH_URL (e.g. https://shortly.driffle.net)").url({ message: "NEXTAUTH_URL must be a valid URL" }),
+    ),
     /** Legacy name; use either this or `AUTH_SECRET` (32+ chars). Output is normalized in `transform`. */
     NEXTAUTH_SECRET: z.string().optional(),
     /** Auth.js v5 name; either secret may be set. */
@@ -66,7 +81,10 @@ const envSchema = z
 
     ALLOWED_EMAIL_DOMAIN: z.string().default("driffle.com"),
 
-    PUBLIC_APP_URL: z.string().url(),
+    PUBLIC_APP_URL: z.preprocess(
+      normalizeHttpUrlInput,
+      z.string().min(1, "Set PUBLIC_APP_URL (usually same origin as NEXTAUTH_URL)").url({ message: "PUBLIC_APP_URL must be a valid URL" }),
+    ),
     SHORT_LINK_HOST: z.string().min(1).default("go.driffle.com"),
     /** Exposed to browser for display (optional; falls back to SHORT_LINK_HOST server-side). */
     NEXT_PUBLIC_SHORT_LINK_HOST: z.preprocess(emptyEnvToUndefined, z.string().min(1).optional()),
