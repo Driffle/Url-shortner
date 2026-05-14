@@ -1,14 +1,18 @@
 import { prisma } from "@/server/db/prisma";
 import { RollupGranularity } from "@prisma/client";
 
+export type AnalyticsScope = { linkId?: string };
+
 export class AnalyticsRepository {
-  async clicksByDaySince(since: Date): Promise<{ day: string; clicks: number }[]> {
+  /** Daily click totals from link rollups; pass `linkId` to scope to one short URL. */
+  async clicksByDaySince(since: Date, scope?: AnalyticsScope): Promise<{ day: string; clicks: number }[]> {
     const rows = await prisma.analyticsRollup.groupBy({
       by: ["bucketStart"],
       where: {
         granularity: RollupGranularity.DAY,
         scopeType: "LINK",
         bucketStart: { gte: since },
+        ...(scope?.linkId ? { scopeId: scope.linkId } : {}),
       },
       _sum: { totalClicks: true },
       orderBy: { bucketStart: "asc" },
@@ -36,11 +40,11 @@ export class AnalyticsRepository {
       .slice(0, limit);
   }
 
-  async recentClicks(limit = 20) {
+  async recentClicks(limit = 20, scope?: AnalyticsScope) {
     return prisma.clickEvent.findMany({
       take: limit,
       orderBy: { createdAt: "desc" },
-      where: { isBot: false },
+      where: { isBot: false, ...(scope?.linkId ? { linkId: scope.linkId } : {}) },
       select: {
         id: true,
         createdAt: true,
