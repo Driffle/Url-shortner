@@ -19,8 +19,16 @@ const googleProvider = googleEnabled
       Google({
         clientId: process.env.GOOGLE_CLIENT_ID!.trim(),
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
-        authorization: { params: { prompt: "select_account" } },
-        // redirect_uri comes from provider.callbackUrl (patched via GOOGLE_OAUTH_CALLBACK_URL).
+        // Static endpoints avoid full OIDC discovery. Google's discovery advertises
+        // `authorization_response_iss_parameter_supported`, but Google's redirect often
+        // omits `iss`, which makes oauth4webapi throw "response parameter iss missing".
+        authorization: {
+          url: "https://accounts.google.com/o/oauth2/v2/auth",
+          params: { prompt: "select_account" },
+        },
+        token: "https://oauth2.googleapis.com/token",
+        userinfo: "https://openidconnect.googleapis.com/v1/userinfo",
+        // redirect_uri comes from provider.callbackUrl (GOOGLE_OAUTH_CALLBACK_URL in providers.js).
       }),
     ]
   : [];
