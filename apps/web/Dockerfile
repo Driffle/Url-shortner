@@ -4,8 +4,9 @@ RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-# `postinstall` runs `prisma generate` — schema must exist before `npm ci`
+# `postinstall` runs `prisma generate` + patch script — both must exist before `npm ci`
 COPY prisma ./prisma
+COPY scripts/patch-auth-google-callback.mjs ./scripts/patch-auth-google-callback.mjs
 RUN npm ci
 
 COPY . .
