@@ -9,6 +9,9 @@ import type { UserRole } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { getEnv } from "@/shared/validations/env";
 import { authConfig } from "@/auth.config";
+import { ensureGoogleOAuthCallbackEnv } from "@/shared/lib/google-oauth-callback";
+
+ensureGoogleOAuthCallbackEnv();
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,

@@ -5,6 +5,7 @@ import Google from "next-auth/providers/google";
 import { prisma } from "@/server/db/prisma";
 import { isAuthBypassed } from "@/shared/lib/auth-bypass";
 import { isGoogleAuthDisabled } from "@/shared/lib/google-auth-disabled";
+import { googleOAuthCallbackUrl } from "@/shared/lib/google-oauth-callback";
 import { isGoogleOAuthConfigured } from "@/shared/lib/google-oauth-config";
 
 const googleEnabled =
@@ -15,7 +16,12 @@ const googleProvider = googleEnabled
       Google({
         clientId: process.env.GOOGLE_CLIENT_ID!.trim(),
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
-        authorization: { params: { prompt: "select_account" } },
+        authorization: {
+          params: {
+            prompt: "select_account",
+            redirect_uri: googleOAuthCallbackUrl(),
+          },
+        },
       }),
     ]
   : [];
