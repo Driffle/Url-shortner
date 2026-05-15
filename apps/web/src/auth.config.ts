@@ -5,8 +5,11 @@ import Google from "next-auth/providers/google";
 import { prisma } from "@/server/db/prisma";
 import { isAuthBypassed } from "@/shared/lib/auth-bypass";
 import { isGoogleAuthDisabled } from "@/shared/lib/google-auth-disabled";
-import { googleOAuthCallbackUrl } from "@/shared/lib/google-oauth-callback";
+import { ensureGoogleOAuthCallbackEnv } from "@/shared/lib/google-oauth-callback";
 import { isGoogleOAuthConfigured } from "@/shared/lib/google-oauth-config";
+
+// Must run before providers are built so postinstall patch reads the correct redirect URI.
+ensureGoogleOAuthCallbackEnv();
 
 const googleEnabled =
   !isAuthBypassed() && isGoogleOAuthConfigured() && !isGoogleAuthDisabled();
@@ -16,12 +19,8 @@ const googleProvider = googleEnabled
       Google({
         clientId: process.env.GOOGLE_CLIENT_ID!.trim(),
         clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
-        authorization: {
-          params: {
-            prompt: "select_account",
-            redirect_uri: googleOAuthCallbackUrl(),
-          },
-        },
+        authorization: { params: { prompt: "select_account" } },
+        // redirect_uri comes from provider.callbackUrl (patched via GOOGLE_OAUTH_CALLBACK_URL).
       }),
     ]
   : [];

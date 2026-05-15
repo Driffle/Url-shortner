@@ -17,9 +17,9 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
       REDIS_URL: redis://redis:6379
       REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-dl}
-      NEXTAUTH_URL: ${NEXTAUTH_URL}
-      # Auth.js v5 reads AUTH_URL for OAuth redirect_uri; default to NEXTAUTH_URL so it matches Google Console.
-      AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL}}
+      # Required for Google OAuth redirect_uri (Deployer must set these, or defaults below apply).
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://shortly.driffle.net}
+      AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL:-https://shortly.driffle.net}}
       # Full Google redirect URI override (default: {AUTH_URL origin}/api/auth/google/callback). Must match Google Console.
       GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-}
       # Mirror host values into both names when at least one is set; if neither is set, both are empty and Auth.js will error — set one in `.env`.
@@ -32,9 +32,9 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       # Leave unset so Google is used when GOOGLE_* are set. Set to 1 only to force password-only login.
       DISABLE_GOOGLE_AUTH: ${DISABLE_GOOGLE_AUTH:-}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL}
-      SHORT_LINK_HOST: ${SHORT_LINK_HOST:-go.driffle.com}
-      NEXT_PUBLIC_SHORT_LINK_HOST: ${NEXT_PUBLIC_SHORT_LINK_HOST:-go.driffle.com}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-${NEXTAUTH_URL:-https://shortly.driffle.net}}
+      SHORT_LINK_HOST: ${SHORT_LINK_HOST:-shortly.driffle.net}
+      NEXT_PUBLIC_SHORT_LINK_HOST: ${NEXT_PUBLIC_SHORT_LINK_HOST:-shortly.driffle.net}
       ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-driffle.com}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       CRON_SECRET: ${CRON_SECRET:-}

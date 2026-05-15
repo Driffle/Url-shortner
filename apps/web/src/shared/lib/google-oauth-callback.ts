@@ -1,33 +1,56 @@
 /** OAuth redirect path registered in Google Cloud Console for this app. */
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/auth/google/callback";
 
-/**
- * Full Google OAuth redirect URI (must match Google Console exactly).
- * Built from `AUTH_URL` or `NEXTAUTH_URL` — never from the incoming request host
- * (avoids `https://localhost:3000/...` behind Docker / Cloudflare tunnels).
- */
-export function googleOAuthCallbackUrl(): string {
-  const raw = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "").trim();
-  if (raw) {
-    try {
-      const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-      const origin = new URL(withScheme.replace(/\/+$/, "")).origin;
-      return `${origin}${GOOGLE_OAUTH_CALLBACK_PATH}`;
-    } catch {
-      // fall through
-    }
-  }
-  const fallback =
-    process.env.VERCEL_URL != null && process.env.VERCEL_URL !== ""
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://127.0.0.1:3000";
-  return `${fallback.replace(/\/+$/, "")}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+function trimEnv(key: string): string | undefined {
+  const v = process.env[key]?.trim();
+  return v && v.length > 0 ? v : undefined;
 }
 
-/** Set before Auth.js parses providers (see `scripts/patch-auth-google-callback.mjs`). */
-export function ensureGoogleOAuthCallbackEnv(): void {
-  const current = process.env.GOOGLE_OAUTH_CALLBACK_URL?.trim();
-  if (!current) {
-    process.env.GOOGLE_OAUTH_CALLBACK_URL = googleOAuthCallbackUrl();
+function originFromUrlLike(raw: string): string | null {
+  try {
+    const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    return new URL(withScheme.replace(/\/+$/, "")).origin;
+  } catch {
+    return null;
   }
+}
+
+/**
+ * Full Google OAuth redirect URI (must match Google Console exactly).
+ * Uses env only — never `127.0.0.1` in production.
+ */
+export function googleOAuthCallbackUrl(): string {
+  const explicit = trimEnv("GOOGLE_OAUTH_CALLBACK_URL");
+  if (explicit) return explicit;
+
+  for (const key of ["AUTH_URL", "NEXTAUTH_URL", "PUBLIC_APP_URL"] as const) {
+    const raw = trimEnv(key);
+    if (raw) {
+      const origin = originFromUrlLike(raw);
+      if (origin) return `${origin}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+    }
+  }
+
+  const host = trimEnv("SHORT_LINK_HOST") ?? trimEnv("NEXT_PUBLIC_SHORT_LINK_HOST");
+  if (host) {
+    const hostname = host.replace(/^https?:\/\//, "").split("/")[0];
+    if (hostname && !hostname.startsWith("127.0.0.1") && hostname !== "localhost") {
+      return `https://${hostname}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+    }
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[auth] Set NEXTAUTH_URL and AUTH_URL to your public origin (e.g. https://shortly.driffle.net) in Deployer — " +
+        "Google OAuth cannot use localhost in production.",
+    );
+  }
+
+  // Local dev only
+  return `http://127.0.0.1:3000${GOOGLE_OAUTH_CALLBACK_PATH}`;
+}
+
+/** Refresh on each process start (and before Auth.js loads providers). */
+export function ensureGoogleOAuthCallbackEnv(): void {
+  process.env.GOOGLE_OAUTH_CALLBACK_URL = googleOAuthCallbackUrl();
 }
