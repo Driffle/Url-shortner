@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/server/db/prisma";
-import { getRedis, RedisKeys } from "@/server/redis/client";
+import { RedisKeys } from "@/server/redis/client";
 import { rateLimitAllow } from "@/server/services/rate-limit";
 import { verifyVisitToken } from "@/shared/lib/visit-token";
 
