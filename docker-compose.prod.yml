@@ -20,7 +20,6 @@ services:
       # Required for Google OAuth redirect_uri (Deployer must set these, or defaults below apply).
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://shortly.driffle.net}
       AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL:-https://shortly.driffle.net}}
-      NEXTAUTH_URL: ${NEXTAUTH_URL}
       # Auth.js v5 reads AUTH_URL for OAuth redirect_uri; default to NEXTAUTH_URL so it matches Google Console.
       AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL}}
       # Full Google redirect URI override (default: {AUTH_URL origin}/api/auth/google/callback). Must match Google Console.
