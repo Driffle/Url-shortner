@@ -17,9 +17,15 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
       REDIS_URL: redis://redis:6379
       REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-dl}
+<<<<<<< HEAD
       # Required for Google OAuth redirect_uri (Deployer must set these, or defaults below apply).
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://shortly.driffle.net}
       AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL:-https://shortly.driffle.net}}
+=======
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      # Auth.js v5 reads AUTH_URL for OAuth redirect_uri; default to NEXTAUTH_URL so it matches Google Console.
+      AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL}}
+>>>>>>> origin/main
       # Full Google redirect URI override (default: {AUTH_URL origin}/api/auth/google/callback). Must match Google Console.
       GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-}
       # Mirror host values into both names when at least one is set; if neither is set, both are empty and Auth.js will error — set one in `.env`.
