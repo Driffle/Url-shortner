@@ -61,7 +61,8 @@ Omit them or set to `false` to require Google OAuth. Local-only bypass: `DISABLE
 | `SHORT_LINK_HOST` | Yes | Host shown in UI for short links (e.g. `localhost:3000` locally) |
 | `NEXT_PUBLIC_SHORT_LINK_HOST` | Optional | Same as `SHORT_LINK_HOST` if you want the browser to show it |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | Defaults to `driffle.com` — only that domain can sign in |
-| `BOOTSTRAP_ADMIN_EMAIL` | Optional | After the first user exists, this email gets `ADMIN` on first login |
+| `ADMIN_EMAILS` | Optional | Comma-separated emails granted `ADMIN` on each login (e.g. `you@driffle.com,other@driffle.com`) |
+| `BOOTSTRAP_ADMIN_EMAIL` | Optional | Legacy single email — same as one entry in `ADMIN_EMAILS` |
 | `DISABLE_AUTH` | Optional | `true` + `npm run dev` only — skips Google (see below) |
 | `NEXT_PUBLIC_DISABLE_AUTH` | Optional | `true` with `DISABLE_AUTH` — shows “local dev” hint in menu |
 
