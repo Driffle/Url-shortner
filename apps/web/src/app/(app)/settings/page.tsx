@@ -35,8 +35,10 @@ export default async function SettingsPage() {
             <CardDescription>User provisioning UI can be added here (invite, role changes).</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            MVP: promote additional admins with <code className="rounded bg-muted px-1">BOOTSTRAP_ADMIN_EMAIL</code> on
-            first login, or manage roles directly in the database.
+            Grant admin via env: <code className="rounded bg-muted px-1">ADMIN_EMAILS</code> (comma-separated) or{" "}
+            <code className="rounded bg-muted px-1">BOOTSTRAP_ADMIN_EMAIL</code> — applied on each login. Or set{" "}
+            <code className="rounded bg-muted px-1">User.role</code> to <code className="rounded bg-muted px-1">ADMIN</code>{" "}
+            in the database.
           </CardContent>
         </Card>
       )}

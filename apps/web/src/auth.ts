@@ -9,6 +9,7 @@ import type { UserRole } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { getEnv } from "@/shared/validations/env";
 import { authConfig } from "@/auth.config";
+import { promoteEnvAdminByEmail, promoteEnvAdminByUserId } from "@/shared/lib/promote-env-admin";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -23,6 +24,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ? user.email?.toLowerCase()
           : (user.email ?? profile?.email)?.toLowerCase();
       if (!email || !email.endsWith(`@${domain}`)) return "/login?error=Domain";
+      await promoteEnvAdminByEmail(email);
       return true;
     },
     async jwt({ token, user }) {
@@ -52,13 +54,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
         return;
       }
-      const firstAdmin = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase();
-      if (firstAdmin && user.email?.toLowerCase() === firstAdmin) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { role: "ADMIN" },
-        });
-      }
+      await promoteEnvAdminByUserId(user.id!, user.email);
     },
   },
 });
