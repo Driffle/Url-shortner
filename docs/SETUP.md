@@ -112,7 +112,7 @@ Open **http://127.0.0.1:3000** (matches the default dev script hostname).
 2. Build & run:
 
    ```bash
-   docker compose -f docker-compose.prod.yml build links-web
+   docker compose -f docker-compose.prod.yml build web
    docker compose -f docker-compose.prod.yml up -d
    ```
 
@@ -130,7 +130,7 @@ Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`d
 | Short links return **404** / redirect never runs | Often Redis errors during rate limit or slug cache — fix Redis ACL / prefix first; then confirm the slug exists in the DB. |
 | `Invalid environment` on first Redis/redirect use | Missing or short auth secret (32+ chars), bad URLs, or — if **sign-in is on** — empty `GOOGLE_*`. With no-login flags set, `GOOGLE_*` may be empty. |
 | `[auth][error] MissingSecret` in Docker / production logs | Set **`NEXTAUTH_SECRET`** or **`AUTH_SECRET`** (32+ random chars) on the container. Open-access mode still loads NextAuth for `/api/auth/session` — the secret is required. With Compose, set one in root `.env`; `docker-compose.prod.yml` mirrors it into both env names. |
-| `The table public.User does not exist` (Prisma `P2021`) | Fresh DB with no schema: rebuild/restart the **`links-web`** image so startup runs `prisma db push`, or run `docker compose ... exec links-web npx prisma db push` once. If you set **`SKIP_PRISMA_PUSH=1`**, apply migrations / push yourself. |
+| `The table public.User does not exist` (Prisma `P2021`) | Fresh DB with no schema: rebuild/restart the **`web`** image so startup runs `prisma db push`, or run `docker compose ... exec web npx prisma db push` once. If you set **`SKIP_PRISMA_PUSH=1`**, apply migrations / push yourself. |
 | Cannot sign in with Google | Redirect URI mismatch, wrong `NEXTAUTH_URL`, or email not `@driffle.com` |
 | Port 3000 in use | Stop other process or set `PORT=3001 npm run dev` |
 

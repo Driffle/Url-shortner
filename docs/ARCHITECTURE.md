@@ -236,7 +236,7 @@ Multi-stage: `npm ci` → `prisma generate` → `next build` → `npm prune --om
 **First deploy migrations:** run from a one-off job or init container:
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm links-web npx prisma migrate deploy
+docker compose -f docker-compose.prod.yml run --rm web npx prisma migrate deploy
 ```
 
 For greenfield without migration files yet, use `prisma db push` once, then check in migrations for CI/CD.
@@ -245,7 +245,7 @@ For greenfield without migration files yet, use `prisma db push` once, then chec
 
 ## 14. `docker-compose.prod.yml` (root)
 
-- Services: `links-web`, `db` (Postgres 16), `redis` (AOF persistence)
+- Services: `web`, `db` (Postgres 16), `redis` (AOF persistence)
 - Named volumes for Postgres + Redis
 - Healthchecks on all three services
 - `depends_on` with `condition: service_healthy` for Deployer-compatible startup ordering
@@ -302,7 +302,7 @@ See repository `.env.example` for required variables (`NEXTAUTH_*`, `GOOGLE_*`, 
 
 ## 20. Deployer deployment instructions
 
-1. **Build image** in CI or on Deployer host: `docker compose -f docker-compose.prod.yml build links-web`.
+1. **Build image** in CI or on Deployer host: `docker compose -f docker-compose.prod.yml build web`.
 2. **Secrets**: inject `.env` via Deployer secret store — never commit real values.
 3. **Public hostname (Cloudflare)**: in Deployer, set the FQDN after the stack is up (e.g. `shortly.driffle.net`). Deployer creates a CNAME to your tunnel and adds an ingress rule to `http://127.0.0.1:<WEB_PUBLISH_PORT>` (registered host port, e.g. `1004`). Configure the tunnel under Settings first. HTTPS is terminated at Cloudflare; set `NEXTAUTH_URL` and `PUBLIC_APP_URL` to `https://<that-hostname>` and match **Authorized redirect URIs** in Google OAuth to `https://<hostname>/api/auth/callback/google` when Google sign-in is enabled.
 4. **Short links**: if the app and `/r/*` share one hostname, set `SHORT_LINK_HOST` and `NEXT_PUBLIC_SHORT_LINK_HOST` to the same FQDN (no `https://`). Use a separate short domain only if DNS routes it to this app as well.
