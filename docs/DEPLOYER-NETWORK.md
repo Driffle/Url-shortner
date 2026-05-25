@@ -2,6 +2,6 @@
 
 Deployer attaches services to `deployer_platform`. DNS uses **Compose service names**.
 
-Do not use a generic service name like `web` — it collides with other apps (e.g. BotL). This stack uses **`links-web`**.
+This app keeps the service name **`web`** (required by many Deployer app configs that inject env into `web`).
 
-BotL nginx must target **`botl-web:3000`**, not `web:3000`.
+**BotL** (`Driffle/BotL-Legal-Email-Management`) uses **`botl-web`** so its nginx does not proxy to this app. Do not rename `web` here without updating Deployer **env service names** for this app.

@@ -49,9 +49,9 @@ Optional **local auth bypass** (no Google): set `DISABLE_AUTH=true` and `NEXT_PU
 
 ```bash
 cp .env.example .env   # fill secrets and URLs
-docker compose -f docker-compose.prod.yml build links-web
+docker compose -f docker-compose.prod.yml build web
 docker compose -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.prod.yml exec links-web npx prisma migrate deploy
+docker compose -f docker-compose.prod.yml exec web npx prisma migrate deploy
 ```
 
 Details, security notes, and architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.

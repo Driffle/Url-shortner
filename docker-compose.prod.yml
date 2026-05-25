@@ -2,8 +2,7 @@
 # Validate: `docker compose -f docker-compose.prod.yml config`
 
 services:
-  # Unique name on Deployer shared network (avoid collision with BotL or other apps using `web`).
-  links-web:
+  web:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
