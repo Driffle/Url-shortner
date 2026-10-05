@@ -12,6 +12,8 @@ fail() { echo "✗ $*" >&2; FAILED=1; }
 
 FAILED=0
 SLUG="reg-$(date +%s | shasum -a 256 | cut -c1-8)"
+# Prisma / Zod cuid-shaped id for PATCH /api/links/[id]
+LINK_ID="cl$(echo -n "$SLUG" | shasum -a 256 | cut -c1-23)"
 
 echo "=== Phase 0 regression (BASE=$BASE, slug=$SLUG) ==="
 
@@ -46,7 +48,7 @@ fi
 docker compose -f "$COMPOSE_FILE" exec -T db psql -U postgres -d driffle_links -v ON_ERROR_STOP=1 -c \
   "DELETE FROM \"Link\" WHERE slug = '$SLUG';
    INSERT INTO \"Link\" (id, slug, \"destinationUrl\", status, \"createdById\", \"clickCount\", \"visitCount\", \"uniqueClickEst\", \"createdAt\", \"updatedAt\")
-   VALUES ('link-$SLUG', '$SLUG', 'https://driffle.com/', 'ACTIVE', '$USER_ID', 0, 0, 0, NOW(), NOW());" >/dev/null
+   VALUES ('$LINK_ID', '$SLUG', 'https://driffle.com/', 'ACTIVE', '$USER_ID', 0, 0, 0, NOW(), NOW());" >/dev/null
 
 loc=$(curl -sS -o /dev/null -w "%{http_code} %{redirect_url}" "$BASE/r/$SLUG")
 if echo "$loc" | grep -q "302.*https://driffle.com/"; then pass "/r/ ACTIVE -> 302 driffle.com"; else fail "/r/ ACTIVE $loc"; fi
@@ -54,13 +56,27 @@ if echo "$loc" | grep -q "302.*https://driffle.com/"; then pass "/r/ ACTIVE -> 3
 go=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/go/$SLUG")
 if [[ "$go" == "200" ]]; then pass "/go/ ACTIVE -> 200"; else fail "/go/ ACTIVE -> $go"; fi
 
-# Pause in DB + invalidate slug cache (same as link.service delete/update)
+# PATCH pause via API (warms cache first, no manual Redis DEL)
 docker compose -f "$COMPOSE_FILE" exec -T db psql -U postgres -d driffle_links -c \
-  "UPDATE \"Link\" SET status = 'PAUSED' WHERE slug = '$SLUG';" >/dev/null
-docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli DEL "dl:slug:$SLUG" "dl:slug:miss:$SLUG" >/dev/null
+  "UPDATE \"Link\" SET status = 'ACTIVE' WHERE slug = '$SLUG';" >/dev/null
+docker compose -f "$COMPOSE_FILE" exec -T redis redis-cli DEL "dl:slug:$SLUG" >/dev/null
+warm=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/r/$SLUG")
+if [[ "$warm" != "302" ]]; then fail "warm cache before PATCH expected 302 got $warm"; fi
 
+patch_code=$(curl -sS -o /tmp/patch.json -w "%{http_code}" -X PATCH "$BASE/api/links/$LINK_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"PAUSED"}')
 gone=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/r/$SLUG")
-if [[ "$gone" == "410" ]]; then pass "PAUSED + cache bust -> 410"; else fail "PAUSED expected 410 got $gone"; fi
+if [[ "$patch_code" == "200" && "$gone" == "410" ]]; then
+  pass "PATCH pause -> 410 with warm cache (slug cache refresh)"
+else
+  fail "PATCH pause patch=$patch_code redirect=$gone body=$(cat /tmp/patch.json)"
+fi
+
+# Resume via PATCH
+curl -sS -o /dev/null -X PATCH "$BASE/api/links/$LINK_ID" -H "Content-Type: application/json" -d '{"status":"ACTIVE"}'
+again=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/r/$SLUG")
+if [[ "$again" == "302" ]]; then pass "PATCH resume -> 302"; else fail "PATCH resume expected 302 got $again"; fi
 
 # CSV export (open auth: should 200)
 csv_code=$(curl -sS -o /tmp/links.csv -w "%{http_code}" "$BASE/api/export/links")

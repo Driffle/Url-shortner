@@ -103,6 +103,7 @@ apps/web/
 | `GET /api/health/ready` | Public | Readiness: Postgres + Redis + config guardrails |
 | `GET /r/[slug]` | Public | Redirect + `after()` ingest |
 | `GET /api/export/links` | Session + `readAnalytics` | CSV download |
+| `PATCH /api/links/[id]` | Session + `editLinks` | Pause/resume/edit destination; refreshes slug cache |
 | `GET /api/links/[id]/qr` | Session + `readAnalytics` | SVG QR for short URL |
 | `POST /api/cron/rollup` | `Bearer CRON_SECRET` | Aggregation job hook |
 

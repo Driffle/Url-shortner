@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { prisma } from "@/server/db/prisma";
+import { getAppSession } from "@/server/auth-session";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
+import { can, Permissions } from "@/shared/lib/rbac";
+import { LinkRowActions } from "@/features/links/components/link-row-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function LinksPage() {
+  const session = await getAppSession();
+  const canEdit = session?.user?.role ? can(session.user.role, Permissions.editLinks) : false;
+
   const links = await prisma.link.findMany({
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -21,11 +27,14 @@ export default async function LinksPage() {
           <p className="text-muted-foreground">
             Copy the tracked short URL (includes https and /go/). Instant redirect without a visit count: replace{" "}
             <span className="font-mono">/go/</span> with <span className="font-mono">/r/</span> in the same host.
+            {canEdit ? " Use Pause or Edit URL to update redirects; changes apply within seconds." : null}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/links/new">Create link</Link>
-        </Button>
+        {canEdit ? (
+          <Button asChild>
+            <Link href="/links/new">Create link</Link>
+          </Button>
+        ) : null}
       </div>
 
       <Card>
@@ -36,9 +45,11 @@ export default async function LinksPage() {
           {links.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
               <p className="text-sm text-muted-foreground">No links yet. Create your first short link.</p>
-              <Button asChild>
-                <Link href="/links/new">Create link</Link>
-              </Button>
+              {canEdit ? (
+                <Button asChild>
+                  <Link href="/links/new">Create link</Link>
+                </Button>
+              ) : null}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -51,7 +62,7 @@ export default async function LinksPage() {
                     <th className="pb-2 pr-4 font-medium">Clicks</th>
                     <th className="pb-2 pr-4 font-medium">Visits</th>
                     <th className="pb-2 pr-4 font-medium">Status</th>
-                    <th className="pb-2 font-medium"> </th>
+                    <th className="pb-2 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -72,10 +83,19 @@ export default async function LinksPage() {
                       <td className="py-3 pr-4">{l.clickCount.toLocaleString()}</td>
                       <td className="py-3 pr-4">{l.visitCount.toLocaleString()}</td>
                       <td className="py-3 pr-4">{l.status}</td>
-                      <td className="py-3">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/analytics?slug=${encodeURIComponent(l.slug)}`}>Analytics</Link>
-                        </Button>
+                      <td className="py-3 align-top">
+                        <div className="flex flex-col items-end gap-2">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/analytics?slug=${encodeURIComponent(l.slug)}`}>Analytics</Link>
+                          </Button>
+                          <LinkRowActions
+                            linkId={l.id}
+                            slug={l.slug}
+                            status={l.status}
+                            destinationUrl={l.destinationUrl}
+                            canEdit={canEdit}
+                          />
+                        </div>
                       </td>
                     </tr>
                   ))}

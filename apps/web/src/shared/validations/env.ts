@@ -110,6 +110,11 @@ const envSchema = z
     /** Seconds to wait on `/go/[slug]` before counting a visit and redirecting (default 5). */
     VISIT_HOLD_SECONDS: z.string().optional(),
 
+    /** Redirect rate limit: requests per IP per 60s window (default 300). Raise for load tests only. */
+    REDIRECT_RL_IP_PER_MIN: z.string().optional(),
+    /** Redirect rate limit: requests per slug per 60s window (default 2000). */
+    REDIRECT_RL_SLUG_PER_MIN: z.string().optional(),
+
     ALLOWED_EMAIL_DOMAIN: z.string().default("driffle.com"),
 
     PUBLIC_APP_URL: z.preprocess(
@@ -177,7 +182,20 @@ const envSchema = z
       const n = parseInt(raw, 10);
       if (!Number.isNaN(n)) visitHold = Math.min(120, Math.max(1, n));
     }
-    return { ...data, NEXTAUTH_SECRET: resolved, VISIT_HOLD_SECONDS: visitHold };
+    const parseRl = (v: string | undefined, fallback: number, max: number) => {
+      const t = v?.trim();
+      if (!t) return fallback;
+      const n = parseInt(t, 10);
+      if (Number.isNaN(n)) return fallback;
+      return Math.min(max, Math.max(1, n));
+    };
+    return {
+      ...data,
+      NEXTAUTH_SECRET: resolved,
+      VISIT_HOLD_SECONDS: visitHold,
+      REDIRECT_RL_IP_PER_MIN: parseRl(data.REDIRECT_RL_IP_PER_MIN, 300, 50_000),
+      REDIRECT_RL_SLUG_PER_MIN: parseRl(data.REDIRECT_RL_SLUG_PER_MIN, 2000, 500_000),
+    };
   });
 
 export type Env = z.infer<typeof envSchema>;

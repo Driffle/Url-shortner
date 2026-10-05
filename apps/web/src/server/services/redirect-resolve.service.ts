@@ -5,6 +5,7 @@ import {
 } from "@/server/services/slug-cache.service";
 import { RedisKeys } from "@/server/redis/client";
 import { rateLimitAllow } from "@/server/services/rate-limit";
+import { getEnv } from "@/shared/validations/env";
 
 export type RedirectRequestMeta = {
   ip: string | null;
@@ -32,8 +33,13 @@ export async function resolveSlugForRedirect(
 ): Promise<ResolveSlugForRedirectResult> {
   const slug = rawSlug.toLowerCase();
   const window = rateLimitWindowKey();
-  const ipOk = await rateLimitAllow(RedisKeys.rateLimitIp(meta.ip ?? "unknown", window), 300, 60);
-  const slugOk = await rateLimitAllow(RedisKeys.rateLimitSlug(slug, window), 2000, 60);
+  const env = getEnv();
+  const ipOk = await rateLimitAllow(
+    RedisKeys.rateLimitIp(meta.ip ?? "unknown", window),
+    env.REDIRECT_RL_IP_PER_MIN,
+    60,
+  );
+  const slugOk = await rateLimitAllow(RedisKeys.rateLimitSlug(slug, window), env.REDIRECT_RL_SLUG_PER_MIN, 60);
   if (!ipOk || !slugOk) {
     return { kind: "rate_limited" };
   }
