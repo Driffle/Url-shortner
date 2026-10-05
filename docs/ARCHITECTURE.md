@@ -99,7 +99,8 @@ apps/web/
 | Route | Auth | Notes |
 |--------|------|------|
 | `GET/POST /api/auth/[...nextauth]` | Public | Google OAuth |
-| `GET /api/health` | Public | Docker / Deployer probes |
+| `GET /api/health` | Public | Liveness (process up) |
+| `GET /api/health/ready` | Public | Readiness: Postgres + Redis + config guardrails |
 | `GET /r/[slug]` | Public | Redirect + `after()` ingest |
 | `GET /api/export/links` | Session + `readAnalytics` | CSV download |
 | `GET /api/links/[id]/qr` | Session + `readAnalytics` | SVG QR for short URL |
@@ -116,10 +117,12 @@ Pattern: `const session = await auth()` → `can(role, permission)` in services 
 
 ## 5. Redirect middleware / route
 
+Shared resolution lives in **`src/server/services/redirect-resolve.service.ts`** (used by `/r/[slug]` and `/go/[slug]`).
+
 Implemented as **`GET` Route Handler** `src/app/r/[slug]/route.ts` (Node runtime for `ioredis` + Prisma).
 
 1. Rate limit (Redis) per IP and per slug window.
-2. Resolve slug: Redis cache → Postgres fallback → populate cache.
+2. Resolve slug: Redis cache → negative cache on miss → Postgres fallback → populate cache.
 3. Validate status + expiry → `302` or `410`.
 4. `after(() => clickIngestService.ingest(...))` — non-blocking.
 5. On ingest failure → best-effort `LPUSH` to `dl:queue:clicks` for a worker.
@@ -172,6 +175,7 @@ Cron contract: `Authorization: Bearer ${CRON_SECRET}`.
 | Key pattern | TTL | Use |
 |-------------|-----|-----|
 | `dl:slug:{slug}` | 3600s | Hot redirect resolution |
+| `dl:slug:miss:{slug}` | 60s | Negative cache for unknown slugs |
 | `dl:rl:ip:{ip}:{window}` | 60s | Redirect rate limit |
 | `dl:rl:slug:{slug}:{window}` | 60s | Abuse protection |
 | `dl:feed:clicks` | list trim 200 | “Live” internal feed / future WS |
@@ -233,13 +237,15 @@ Implementation: `src/shared/lib/rbac.ts` + service-level `requirePermission` / e
 
 Multi-stage: `npm ci` → `prisma generate` → `next build` → `npm prune --omit=dev` → slim runtime with `next start`.
 
-**First deploy migrations:** run from a one-off job or init container:
+**Production schema:** versioned migrations under `apps/web/prisma/migrations/`. Apply before traffic:
 
 ```bash
 docker compose -f docker-compose.prod.yml run --rm web npx prisma migrate deploy
 ```
 
-For greenfield without migration files yet, use `prisma db push` once, then check in migrations for CI/CD.
+Optional: set `RUN_MIGRATE_ON_START=1` on the web service to run `migrate deploy` on container start (prefer a one-off job when possible). Local dev may still use `prisma migrate dev` or `db push` for prototypes.
+
+**Redis connections:** one `ioredis` client per Node worker (`getRedis()` singleton); size Redis `maxclients` for `(web replicas × workers)`.
 
 ---
 
@@ -307,7 +313,7 @@ See repository `.env.example` for required variables (`NEXTAUTH_*`, `GOOGLE_*`, 
 3. **Public hostname (Cloudflare)**: in Deployer, set the FQDN after the stack is up (e.g. `shortly.driffle.net`). Deployer creates a CNAME to your tunnel and adds an ingress rule to `http://127.0.0.1:<WEB_PUBLISH_PORT>` (registered host port, e.g. `1004`). Configure the tunnel under Settings first. HTTPS is terminated at Cloudflare; set `NEXTAUTH_URL` and `PUBLIC_APP_URL` to `https://<that-hostname>` and match **Authorized redirect URIs** in Google OAuth to `https://<hostname>/api/auth/callback/google` when Google sign-in is enabled.
 4. **Short links**: if the app and `/r/*` share one hostname, set `SHORT_LINK_HOST` and `NEXT_PUBLIC_SHORT_LINK_HOST` to the same FQDN (no `https://`). Use a separate short domain only if DNS routes it to this app as well.
 5. **Migrations**: run `npx prisma migrate deploy` as a pre-start or one-off task before traffic shifts.
-6. **Health**: Deployer should use `GET /api/health` (compose healthcheck already does).
+6. **Health**: Deployer should use `GET /api/health/ready` (compose healthcheck uses readiness).
 7. **Cron**: register HTTP call to `POST /api/cron/rollup` with `Authorization: Bearer $CRON_SECRET` nightly + weekly digest calling `postSlack`.
 
 ---

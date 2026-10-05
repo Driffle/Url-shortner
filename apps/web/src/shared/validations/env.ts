@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { isAuthBypassedFromEnvFields } from "@/shared/lib/auth-bypass";
 
+function truthyEnv(v: string | undefined): boolean {
+  return v === "true" || v === "1";
+}
+
 /** Compose / Deployer often set `VAR=` (empty). Treat as unset for optional fields. */
 function emptyEnvToUndefined(v: unknown): unknown {
   if (v === undefined || v === null) return undefined;
@@ -94,6 +98,8 @@ const envSchema = z
     NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: z.string().optional(),
     /** Local dev only with `NODE_ENV=development`. */
     DISABLE_AUTH: z.string().optional(),
+    /** Required with `PUBLIC_APP_NO_AUTH` in production (staging only). */
+    I_ACCEPT_OPEN_AUTH_IN_PROD: z.string().optional(),
 
     GOOGLE_CLIENT_ID: z.string().default(""),
     GOOGLE_CLIENT_SECRET: z.string().default(""),
@@ -136,7 +142,20 @@ const envSchema = z
       DISABLE_AUTH: data.DISABLE_AUTH,
       NODE_ENV: data.NODE_ENV,
     });
-    if (bypass) return;
+    if (bypass) {
+      const openProd =
+        data.NODE_ENV === "production" &&
+        (truthyEnv(data.PUBLIC_APP_NO_AUTH) || truthyEnv(data.NEXT_PUBLIC_PUBLIC_APP_NO_AUTH));
+      if (openProd && !truthyEnv(data.I_ACCEPT_OPEN_AUTH_IN_PROD)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "PUBLIC_APP_NO_AUTH in production requires I_ACCEPT_OPEN_AUTH_IN_PROD=1 (staging only)",
+          path: ["PUBLIC_APP_NO_AUTH"],
+        });
+      }
+      return;
+    }
 
     const googleDisabled = ["1", "true", "yes"].includes(
       (data.DISABLE_GOOGLE_AUTH ?? "").trim().toLowerCase(),

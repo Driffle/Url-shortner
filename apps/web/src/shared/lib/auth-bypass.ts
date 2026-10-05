@@ -14,6 +14,20 @@ function truthyEnv(v: string | undefined): boolean {
   return v === "true" || v === "1";
 }
 
+/** Explicit ack required to run open-auth mode in production (staging only). */
+export function isOpenAuthInProdAcknowledged(): boolean {
+  return truthyEnv(process.env.I_ACCEPT_OPEN_AUTH_IN_PROD);
+}
+
+/**
+ * Production misconfiguration: public no-auth flags set without explicit acknowledgement.
+ */
+export function isProductionOpenAuthMisconfigured(): boolean {
+  if (process.env.NODE_ENV !== "production") return false;
+  if (!isPublicAppNoAuthEnabled()) return false;
+  return !isOpenAuthInProdAcknowledged();
+}
+
 /** Subset of env used for bypass checks (also validated in `env.ts`). */
 export type AuthBypassEnvFields = {
   PUBLIC_APP_NO_AUTH?: string | undefined;

@@ -1,5 +1,5 @@
-import type { Link, UserRole } from "@prisma/client";
-import { createLinkSchema } from "@/shared/validations/link";
+import type { Link, Prisma, UserRole } from "@prisma/client";
+import { createLinkSchema, updateLinkSchema } from "@/shared/validations/link";
 import { assertSafeDestination } from "@/server/services/url-safety";
 import { randomSlug } from "@/server/services/slug-generator";
 import { linkRepository } from "@/server/repositories/link-repository";
@@ -44,7 +44,7 @@ export class LinkService {
       createdBy: { connect: { id: actorId } },
     });
 
-    await slugCacheService.set(slug, {
+    await slugCacheService.invalidateOrRefresh(slug, {
       destinationUrl: link.destinationUrl,
       linkId: link.id,
       status: link.status,
@@ -71,7 +71,7 @@ export class LinkService {
     const link = await linkRepository.findById(linkId);
     if (!link) throw new Error("Not found");
     await linkRepository.delete(linkId);
-    await slugCacheService.invalidate(link.slug);
+    await slugCacheService.invalidateOrRefresh(link.slug, null);
     await prisma.auditLog.create({
       data: {
         userId: actorId,
@@ -81,6 +81,48 @@ export class LinkService {
         metadata: { slug: link.slug },
       },
     });
+  }
+
+  async updateLink(actorId: string, role: UserRole, raw: unknown): Promise<Link> {
+    if (!can(role, Permissions.editLinks)) {
+      throw new Error("Your role cannot edit links.");
+    }
+    const input = updateLinkSchema.parse(raw);
+    const existing = await linkRepository.findById(input.id);
+    if (!existing) throw new Error("Not found");
+
+    if (input.destinationUrl !== undefined) {
+      assertSafeDestination(input.destinationUrl);
+    }
+
+    const data: Prisma.LinkUpdateInput = {};
+    if (input.destinationUrl !== undefined) data.destinationUrl = input.destinationUrl;
+    if (input.campaignId !== undefined) data.campaign = { connect: { id: input.campaignId } };
+    if (input.expiresAt !== undefined) data.expiresAt = input.expiresAt;
+    if (input.notes !== undefined) data.notes = input.notes;
+    if (input.tags !== undefined) data.tags = input.tags;
+    if (input.status !== undefined) data.status = input.status;
+
+    const link = await linkRepository.update(input.id, data);
+
+    await slugCacheService.invalidateOrRefresh(link.slug, {
+      destinationUrl: link.destinationUrl,
+      linkId: link.id,
+      status: link.status,
+      expiresAt: link.expiresAt?.toISOString() ?? null,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: "LINK_UPDATE",
+        entityType: "Link",
+        entityId: link.id,
+        metadata: { slug: link.slug },
+      },
+    });
+
+    return link;
   }
 }
 
