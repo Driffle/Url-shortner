@@ -72,6 +72,85 @@ flowchart LR
 
 ---
 
+## Throughput and volume expectations (lean v1)
+
+Numbers below assume the **minimum viable stack** above and **Phase 0** behavior: each redirect still triggers **Postgres click ingest** in `after()` (see [ARCHITECTURE.md](./ARCHITECTURE.md)). Order-of-magnitude only — validate with your campaign patterns and metrics.
+
+### Redirects (read path)
+
+| Scenario | Expectation |
+|----------|-------------|
+| **Comfortable sustained load** | **~5–15 RPS** overall with **warm slug cache** (Redis hit) |
+| **Short bursts** | Often **tens of RPS for seconds** if the pod CPU limit (500m) and Redis keep up; not guaranteed at 100m CPU request |
+| **Per client IP** (default app limits) | **~5 RPS max per IP** (`REDIRECT_RL_IP_PER_MIN=300`) — single load tester hits **429** quickly; real users spread across many IPs |
+| **Per short link (slug)** | **~33 RPS max per slug** (`REDIRECT_RL_SLUG_PER_MIN=2000`) — one hot link may **429** before the pod is exhausted |
+| **Latency (warm cache, in-region)** | **~10–100 ms p95** when not rate-limited; cache misses add Postgres read latency |
+
+**Redirect-only upper bound (if nothing else broke):**
+
+| Sustained RPS | Approx. redirects / day |
+|---------------|-------------------------|
+| 5 | ~430k |
+| 15 | ~1.3M |
+
+On lean v1 you typically **do not** reach these redirect-only ceilings because **click writes** limit you first (next section).
+
+### Clicks and analytics (usual bottleneck — Phase 0)
+
+Each redirect can produce a **multi-statement Postgres transaction** (click row, counters, rollups, dimension upserts).
+
+| Postgres (lean) | Sustainable click ingest (Phase 0) | Redirects / day if ~1 click per redirect |
+|-----------------|-----------------------------------|------------------------------------------|
+| **1 vCPU / 2 GiB** | **~2–10 writes/s sustained** (campaign-dependent) | **~170k–860k / day** |
+| Same, **spike** | **~20–50 writes/s for minutes** may be tolerable | Short email/push spikes; watch CPU and lag |
+
+**Planning bands for lean v1:**
+
+| Use case | Clicks / day (order of magnitude) |
+|----------|-----------------------------------|
+| Internal day-to-day | Well within capacity |
+| Single modest campaign | **Low thousands – low tens of thousands** over a few hours |
+| Heavy / viral campaign | **Risky** — expect **429s**, DB pressure, or slow dashboards |
+| Marketplace-scale traffic | **Out of scope** — scale up + [Phase 1 async ingest](#references) (#31) |
+
+### Admin and product usage
+
+| Dimension | Lean v1 |
+|-----------|---------|
+| Concurrent dashboard users | **~10–30** typical |
+| Links stored | Thousands – tens of thousands (UI lists **50** per page today) |
+| CSV export | Up to **5,000** links per download |
+
+### Storage (Postgres ~20–30 GiB disk)
+
+`ClickEvent` drives growth (indexes + append-only stream).
+
+| Rough row count | Notes |
+|-----------------|--------|
+| **~1–5M** click rows | Reasonable “still comfortable on small disk” band; plan retention/partitioning (Phase 2) beyond that |
+| **~5 writes/s** | ~5M rows in **~12 days** if sustained continuously |
+| **~1 write/s** | ~5M rows in **~58 days** |
+
+Row size varies with referrer/device normalization; treat days-to-fill as **estimate only**.
+
+### What limits you first (typical order)
+
+1. **Postgres write rate** (campaign clicks) — Phase 0 synchronous ingest  
+2. **Per-IP / per-slug rate limits** — abuse, load tests, or one very hot link  
+3. **Single pod CPU** (500m limit) — SSR admin + redirects together  
+4. **Redis memory** — unlikely at internal scale unless queues grow unbounded (cap in Phase 1)
+
+### Stakeholder summary
+
+| Question | Lean v1 answer |
+|----------|----------------|
+| Internal Driffle daily use? | **Yes** |
+| One marketing campaign, normal list size? | **Yes** (low k – low tens of k clicks over hours) |
+| Large public viral link? | **No** without scale-up and Phase 1+ |
+| Viral / marketplace traffic? | **No** — not this footprint |
+
+---
+
 ## Cron (minimal)
 
 | Job | When |
