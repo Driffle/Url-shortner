@@ -43,6 +43,7 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       PUBLIC_APP_NO_AUTH: ${PUBLIC_APP_NO_AUTH:-}
       NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: ${NEXT_PUBLIC_PUBLIC_APP_NO_AUTH:-}
+      I_ACCEPT_OPEN_AUTH_IN_PROD: ${I_ACCEPT_OPEN_AUTH_IN_PROD:-}
       # Set to 1 to run `prisma migrate deploy` before `next start` (prefer one-off deploy job when possible).
       RUN_MIGRATE_ON_START: ${RUN_MIGRATE_ON_START:-}
     depends_on:
