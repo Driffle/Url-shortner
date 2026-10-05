@@ -56,6 +56,8 @@ docker compose -f docker-compose.prod.yml exec web npx prisma migrate deploy
 
 Details, security notes, and architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
+Kubernetes sizing for DevOps: **[docs/KUBERNETES-CAPACITY.md](docs/KUBERNETES-CAPACITY.md)**.
+
 ## CI
 
 GitHub Actions runs lint and build on push/PR (see `.github/workflows/ci.yml`).

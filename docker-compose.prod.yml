@@ -43,15 +43,16 @@ services:
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       PUBLIC_APP_NO_AUTH: ${PUBLIC_APP_NO_AUTH:-}
       NEXT_PUBLIC_PUBLIC_APP_NO_AUTH: ${NEXT_PUBLIC_PUBLIC_APP_NO_AUTH:-}
-      # Set to 1 only if you apply schema yourself (e.g. prisma migrate deploy elsewhere).
-      SKIP_PRISMA_PUSH: ${SKIP_PRISMA_PUSH:-}
+      I_ACCEPT_OPEN_AUTH_IN_PROD: ${I_ACCEPT_OPEN_AUTH_IN_PROD:-}
+      # Set to 1 to run `prisma migrate deploy` before `next start` (prefer one-off deploy job when possible).
+      RUN_MIGRATE_ON_START: ${RUN_MIGRATE_ON_START:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health/ready"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -22,8 +22,9 @@ if [ -z "${GOOGLE_OAUTH_CALLBACK_URL:-}" ]; then
   echo "driffle-links: GOOGLE_OAUTH_CALLBACK_URL=${GOOGLE_OAUTH_CALLBACK_URL}"
 fi
 
-if [ "${SKIP_PRISMA_PUSH:-}" != "1" ]; then
-  echo "driffle-links: syncing Prisma schema to Postgres (set SKIP_PRISMA_PUSH=1 to skip)..."
-  npx prisma db push --skip-generate
+if [ "${RUN_MIGRATE_ON_START:-}" = "1" ]; then
+  echo "driffle-links: applying Prisma migrations (RUN_MIGRATE_ON_START=1)..."
+  npx prisma migrate deploy
 fi
+
 exec npm run start

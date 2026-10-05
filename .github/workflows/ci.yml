@@ -37,3 +37,73 @@ jobs:
           GOOGLE_CLIENT_SECRET: "ci-placeholder-google-client-secret"
           PUBLIC_APP_URL: http://localhost:3000
         run: npm run build
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: driffle_links
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d driffle_links"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driffle_links?schema=public
+        run: npx prisma migrate deploy
+
+      - name: Unit tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driffle_links?schema=public
+          REDIS_URL: redis://localhost:6379
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: "01234567890123456789012345678901"
+          PUBLIC_APP_URL: http://localhost:3000
+        run: npm run test:unit
+
+      - name: Build and smoke readiness
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driffle_links?schema=public
+          REDIS_URL: redis://localhost:6379
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: "01234567890123456789012345678901"
+          GOOGLE_CLIENT_ID: "ci-placeholder-google-client-id"
+          GOOGLE_CLIENT_SECRET: "ci-placeholder-google-client-secret"
+          PUBLIC_APP_URL: http://localhost:3000
+        run: |
+          npm run build
+          npm run start &
+          sleep 8
+          curl -sf http://127.0.0.1:3000/api/health/ready | grep '"ok":true'
+          curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/r/ci-missing-slug-xyz | grep 404

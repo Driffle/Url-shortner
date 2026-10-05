@@ -13,6 +13,15 @@ export async function createLinkAction(input: unknown) {
   return { ok: true as const, link };
 }
 
+export async function updateLinkAction(input: unknown) {
+  const session = await getAppSession();
+  if (!session?.user?.id || !session.user.role) throw new Error("Unauthorized");
+  const link = await linkService.updateLink(session.user.id, session.user.role, input);
+  revalidatePath("/links");
+  revalidatePath("/dashboard");
+  return { ok: true as const, link };
+}
+
 export async function deleteLinkAction(linkId: string) {
   const session = await getAppSession();
   if (!session?.user?.id || !session.user.role) throw new Error("Unauthorized");

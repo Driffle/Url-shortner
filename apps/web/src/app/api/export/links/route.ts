@@ -1,6 +1,7 @@
 import { getAppSession } from "@/server/auth-session";
 import { prisma } from "@/server/db/prisma";
 import { can, Permissions } from "@/shared/lib/rbac";
+import { publicInstantShortUrl, publicShortUrl } from "@/shared/lib/short-link-url";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +22,21 @@ export async function GET() {
     include: { campaign: { select: { name: true } } },
   });
 
-  const host = process.env.SHORT_LINK_HOST ?? "go.driffle.com";
-  const header = ["slug", "short_url", "destination", "campaign", "clicks", "status", "created_at"].join(",");
+  const header = [
+    "slug",
+    "short_url_go",
+    "short_url_instant",
+    "destination",
+    "campaign",
+    "clicks",
+    "status",
+    "created_at",
+  ].join(",");
   const rows = links.map((l) =>
     [
       l.slug,
-      `https://${host}/${l.slug}`,
+      publicShortUrl(l.slug),
+      publicInstantShortUrl(l.slug),
       l.destinationUrl,
       l.campaign?.name ?? "",
       String(l.clickCount),
