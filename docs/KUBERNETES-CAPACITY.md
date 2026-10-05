@@ -1,159 +1,117 @@
-# Driffle Links — Kubernetes capacity guide (DevOps)
+# Driffle Links — Kubernetes capacity (lean / startup)
 
-Internal URL shortener monolith: **Next.js web** + **PostgreSQL** + **Redis**. No separate redirect microservice (Phase 0–1).
+Internal URL shortener **monolith**: Next.js + PostgreSQL + Redis. Goal: **smallest bill that still handles internal traffic**, scale only when metrics hurt.
 
-Use this document for initial prod sizing, HPA baselines, and dependency limits. Tune with real metrics after go-live.
-
----
-
-## Traffic assumptions (internal Driffle)
-
-| Profile | Redirect RPS (peak) | Dashboard users | Notes |
-|---------|---------------------|-----------------|--------|
-| **Baseline** | &lt; 5 | &lt; 30 concurrent | Day-to-day marketing links |
-| **Campaign spike** | 20–80 | &lt; 50 | Email/push with short links |
-| **Stress** | 100–300 | &lt; 100 | Requires Phase 1 async ingest; watch Postgres writes |
-
-Redirect path is **Redis cache + optional Postgres read**; click analytics still write to Postgres (Phase 0: synchronous `after()` ingest).
+Share this with DevOps for first prod deploy; upgrade when you hit the **“scale triggers”** at the bottom.
 
 ---
 
-## Recommended starting topology (production)
+## Philosophy
+
+| Principle | What we do |
+|-----------|------------|
+| **Min resources first** | Start with **1 web pod**, **smallest managed Postgres**, **tiny Redis** (or Redis sidecar — see below). |
+| **Max output on that stack** | Warm redirects are cache-bound; this footprint is enough for **~5–15 sustained redirect RPS** and a small internal team. Spikes above that need scale-up or Phase 1 async clicks. |
+| **HA later** | Second web pod, Multi-AZ DB, and HPA **after** you care about deploy uptime or measured load — not day one. |
+| **Same compose mental model** | Prod K8s ≈ one `web` + `db` + `redis`; no extra services until Phase 1 worker. |
+
+---
+
+## Minimum viable stack (recommended v1)
 
 ```mermaid
 flowchart LR
-  CF[Cloudflare / Ingress] --> ING[Ingress NGINX or CF tunnel]
-  ING --> WEB[Deployment driffle-links-web]
-  WEB --> PG[(PostgreSQL RDS or CloudNativePG)]
-  WEB --> RD[(Redis ElastiCache / managed)]
+  CF[Cloudflare / tunnel] --> WEB[1× web pod]
+  WEB --> PG[(Postgres small)]
+  WEB --> RD[(Redis small)]
 ```
 
-| Component | HA | Min replicas / nodes |
-|-----------|----|----------------------|
-| **web** | Yes | **2** pods (anti-affinity across nodes) |
-| **PostgreSQL** | Yes | Primary + standby (managed RDS Multi-AZ or equivalent) |
-| **Redis** | Optional | 1 primary (+ replica if managed HA); AOF or RDB per policy |
+| Component | Startup choice | Approx. capacity on this size |
+|-----------|----------------|-------------------------------|
+| **web** | **1 replica**, 100m request / 500m limit CPU, **384–512Mi** request memory | Dashboard + **~5–15 RPS** redirects (warm slug cache); brief unavailability on rolling deploy |
+| **PostgreSQL** | **1 vCPU, 2 GiB** class (e.g. burstable micro/small), 20–30 GiB disk, **single-AZ** | Fine for low click volume; **writes** (analytics) bite before reads do |
+| **Redis** | **128–256 MiB** managed, or **Redis 7 sidecar** in same pod/network (dev/staging style) | Slug cache + rate limits; no persistence required |
+
+**Expected monthly shape (order of magnitude):** one small VM-equivalent for app + smallest RDS + smallest Redis — treat as **internal tool tier**, not marketplace tier.
 
 ---
 
-## Web Deployment (`driffle-links-web`)
+## Web Deployment spec (copy-paste baseline)
 
-Built from `apps/web/Dockerfile` — `next start` on port **3000**.
+| Setting | Lean value |
+|---------|------------|
+| `replicas` | **1** (→ **2** when you need zero-downtime deploys or CPU &gt; ~60% sustained) |
+| `resources.requests` | `cpu: 100m`, `memory: 384Mi` |
+| `resources.limits` | `cpu: 500m`, `memory: 768Mi` |
+| `readinessProbe` | `GET /api/health/ready:3000` |
+| `livenessProbe` | `GET /api/health:3000` |
+| HPA | **Skip initially**; add 1→3 at 70% CPU when traffic grows |
 
-### Starter resources (per pod)
+**Prisma:** append `?connection_limit=5` to `DATABASE_URL` on a single pod (no PgBouncer until **2+ pods** or connection errors).
 
-| | Requests | Limits | Rationale |
-|---|----------|--------|-----------|
-| **CPU** | 250m | 1000m | Next.js SSR + redirect handlers; burst on cold start |
-| **Memory** | 512Mi | 1Gi | `.next` + Node heap; increase if OOM during build-less runtime |
+**Redis:** **1 TCP connection per pod** (`ioredis` singleton). Sidecar Redis: `redis://127.0.0.1:6379` in the same pod — acceptable for internal v1 if ops accepts pod restart = cache flush.
 
-### Replicas & HPA (starting point)
-
-| Setting | Value |
-|---------|--------|
-| `minReplicas` | **2** |
-| `maxReplicas` | **6** (raise after Phase 1 worker split if needed) |
-| Scale metric | CPU **70%** avg over 3m, or ingress **RPS** if available |
-| `minReadySeconds` | 10 |
-| `readinessProbe` | `GET /api/health/ready` port 3000, `timeoutSeconds: 3`, `periodSeconds: 10` |
-| `livenessProbe` | `GET /api/health` port 3000, `periodSeconds: 30` |
-
-**Redis connections:** one `ioredis` client per Node worker ≈ **1 connection per pod** (not per request). Size Redis `maxclients` ≥ `(web_pods × 2)` + headroom for workers/cron.
-
-**Postgres connections:** set Prisma `connection_limit` **5–10 per pod**. With 2–6 pods, use **PgBouncer** (transaction mode) or RDS Proxy if total &gt; ~40 connections.
-
-### Environment (required)
-
-See repo `.env.example`. Critical for K8s:
-
-- `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `PUBLIC_APP_URL`
-- `RUN_MIGRATE_ON_START=0` in prod — run **`prisma migrate deploy`** as a **Job** before rollout
-- Do **not** set `PUBLIC_APP_NO_AUTH` in prod without explicit process approval
-
-Optional tuning:
-
-- `REDIRECT_RL_IP_PER_MIN` (default **300**) — app-layer IP limit per 60s
-- `REDIRECT_RL_SLUG_PER_MIN` (default **2000**) — per-slug limit
-- Prefer **Cloudflare / ingress rate limits** for edge abuse; keep app limits as backstop
+**Migrate:** one-off Job `npx prisma migrate deploy` before rollout; **`RUN_MIGRATE_ON_START=0`**.
 
 ---
 
-## PostgreSQL
+## What you get vs. what you give up (1 pod, small DB)
 
-### Starter size (baseline internal)
-
-| | Suggestion |
-|---|------------|
-| **Instance** | 2 vCPU, **4–8 GiB** RAM (e.g. `db.t4g.medium` class) |
-| **Storage** | 50 GiB gp3/ssd, autoscaling enabled |
-| **IOPS** | Default until click volume grows; watch write IOPS on campaigns |
-
-### Growth signals (scale up or Phase 1 async ingest)
-
-- Sustained CPU &gt; 60% on primary
-- Write latency p95 &gt; 20ms on `ClickEvent` inserts
-- Table size &gt; tens of millions of `ClickEvent` rows → partitioning (Phase 2)
-
-**Backups:** daily snapshots + PITR; RTO/RPO per internal SLO (suggest RPO ≤ 24h for this tool unless compliance says otherwise).
+| You get | You give up |
+|---------|-------------|
+| Low cost, simple ops | No AZ failover; DB/Redis down = app down |
+| Enough for internal links + analytics for a small org | Rolling deploy may drop in-flight requests (~seconds) |
+| Redirects fast when slug is in Redis | Campaign **click storms** can saturate DB writes (Phase 0) |
 
 ---
 
-## Redis
+## Edge vs. app (keep app tiny)
 
-| | Suggestion |
-|---|------------|
-| **Memory** | **256 MiB – 512 MiB** (baseline); slug cache + rate limits + queues |
-| **Policy** | `maxmemory-policy` **volatile-lru** on keys with TTL; cap `dl:queue:clicks` in Phase 1 |
-| **Persistence** | AOF **optional** (cache + rate limits are rebuildable); prefer managed Redis |
+- **Cloudflare** (or ingress): TLS, basic WAF, optional rate limit — protects the single pod.
+- App defaults: **300 req/min/IP**, **2000 req/min/slug** (`REDIRECT_RL_*`). Do not raise in prod unless load-testing.
 
 ---
 
-## Ingress & TLS
+## Cron (minimal)
 
-- Terminate TLS at **Cloudflare** or ingress; forward `X-Forwarded-For` / **`CF-Connecting-IP`**
-- Timeouts: **60s** sufficient; redirect responses are fast
-- Body size: default; no large uploads except CSV export (authenticated)
-
----
-
-## Jobs & cron (Kubernetes)
-
-| Job | Schedule | Command |
-|-----|----------|---------|
-| **migrate** | Pre-deploy / manual | `npx prisma migrate deploy` |
-| **rollup** | Nightly | `POST /api/cron/rollup` with `Authorization: Bearer $CRON_SECRET` |
-
-Use **CronJob** or external scheduler (Deployer/Airflow) hitting internal service URL.
+| Job | When |
+|-----|------|
+| `prisma migrate deploy` | Pre-deploy only |
+| `POST /api/cron/rollup` | Nightly (small `CronJob` or external ping) |
 
 ---
 
-## Capacity cheat sheet (order-of-magnitude)
+## Scale triggers (when to spend more)
 
-| Redirect RPS (sustained) | Web pods | Postgres | Redis | Comments |
-|--------------------------|----------|----------|-------|----------|
-| &lt; 10 | 2 × (0.25 CPU, 512Mi) | 2 vCPU / 4GiB | 256MiB | Comfortable baseline |
-| 10–50 | 2–3 × (0.5 CPU, 512Mi) | 2–4 vCPU / 8GiB | 512MiB | Monitor DB write load (clicks) |
-| 50–150 | 3–6 × (0.5–1 CPU, 1Gi) | 4 vCPU / 16GiB + PgBouncer | 512MiB–1GiB | Plan **Phase 1** async click pipeline |
-| &gt; 150 | Revisit architecture | Read replica for analytics UI | Dedicated | Not monolith-only without Phase 1+ |
+Add resources when **any** of these persist for a day — not before:
 
-**Latency target (warm cache):** redirect p95 **&lt; 100 ms** in-region (excludes client network).
+| Signal | Lean upgrade |
+|--------|----------------|
+| Web CPU **&gt; 60%** or memory pressure / OOM | **2 pods**, 512Mi request; optional HPA max 3 |
+| Redirect p95 **&gt; 200 ms** in-region (warm links) | 2 pods + confirm Redis/DB not remote cross-AZ |
+| Postgres CPU **&gt; 60%** or insert lag on clicks | Bigger instance **or** Phase 1 async ingest (issue #31) |
+| Deploy downtime noticed by users | **2 web replicas** + `maxUnavailable: 0` rolling update |
+| Compliance / data durability | Multi-AZ RDS, daily backups (you should have backups anyway) |
 
 ---
 
-## Pre-go-live checklist
+## One-page summary for DevOps
 
-- [ ] Migration Job applied; `SKIP` automatic `db push` on pod start
-- [ ] Readiness probe uses `/api/health/ready`
-- [ ] Secrets in K8s Secret / external store (not in image)
-- [ ] `connection_limit` × replicas ≤ Postgres budget (or PgBouncer)
-- [ ] HPA + PDB (`minAvailable: 1`) on web Deployment
-- [ ] Cloudflare rate limit + WAF on public hostname
-- [ ] SigNoz / logs for 429 rate, readiness failures, Redis memory
+```
+Production v1 (startup):
+  Ingress/Cloudflare → 1× driffle-links-web (100m CPU, 384Mi RAM)
+                     → Postgres 1 vCPU / 2GiB (single-AZ, 20Gi disk)
+                     → Redis 128–256MiB OR sidecar
+
+Handles: internal team + ~5–15 redirect RPS sustained (warm cache).
+Scale:    2 pods + slightly larger RDS when metrics say so.
+Do not:   Multi-AZ + 6 pods + PgBouncer on day one.
+```
 
 ---
 
 ## References
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — components and Redis key patterns
-- [SETUP.md](./SETUP.md) — env vars including `REDIRECT_RL_*`
-- GitHub Issue #30 (Phase 0), #31 (Phase 1 ingest)
+- [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [SETUP.md](./SETUP.md) — env vars
+- Phase 1 (#31) when click write load exceeds small Postgres
