@@ -200,7 +200,7 @@ const envSchema = z
       const n = parseInt(retRaw, 10);
       if (!Number.isNaN(n)) retentionDays = Math.min(730, Math.max(30, n));
     }
-    let analyticsCacheTtl = 300;
+    let analyticsCacheTtl = 90;
     const cacheRaw = data.ANALYTICS_CACHE_TTL_SEC?.trim();
     if (cacheRaw) {
       const n = parseInt(cacheRaw, 10);

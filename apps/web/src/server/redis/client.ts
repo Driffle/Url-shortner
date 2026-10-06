@@ -36,4 +36,18 @@ export const RedisKeys = {
   clickQueue: () => redisKey("queue:clicks"),
   clickStream: () => redisKey("stream:clicks"),
   slugLoadLock: (slug: string) => redisKey(`slug:lock:${slug.toLowerCase()}`),
+  analyticsCacheVersion: () => redisKey("analytics:cache:version"),
+  linksListTotal: (hash: string) => redisKey(`links:count:${hash}`),
 } as const;
+
+/** Bump after rollup so analytics read caches refresh logically. */
+export async function bumpAnalyticsCacheVersion(): Promise<void> {
+  const redis = getRedis();
+  await redis.incr(RedisKeys.analyticsCacheVersion());
+}
+
+export async function getAnalyticsCacheVersion(): Promise<number> {
+  const redis = getRedis();
+  const v = await redis.get(RedisKeys.analyticsCacheVersion());
+  return v ? Number(v) : 0;
+}

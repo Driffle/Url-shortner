@@ -1,8 +1,12 @@
+import { createHash } from "crypto";
 import Link from "next/link";
+import { LinkStatus } from "@prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { getAppSession } from "@/server/auth-session";
+import { getRedis, RedisKeys } from "@/server/redis/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { Input } from "@/shared/ui/input";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
 import { can, Permissions } from "@/shared/lib/rbac";
 import { LinkRowActions } from "@/features/links/components/link-row-actions";
@@ -10,29 +14,85 @@ import { LinkRowActions } from "@/features/links/components/link-row-actions";
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
+const COUNT_CACHE_TTL = 30;
+
+function buildLinksQuery(sp: { q?: string; status?: string; page?: string }) {
+  const q = sp.q?.trim();
+  const statusRaw = sp.status?.trim().toUpperCase();
+  const status =
+    statusRaw && Object.values(LinkStatus).includes(statusRaw as LinkStatus)
+      ? (statusRaw as LinkStatus)
+      : undefined;
+
+  return {
+    q,
+    status,
+    where: {
+      ...(status ? { status } : {}),
+      ...(q
+        ? {
+            OR: [
+              { slug: { contains: q, mode: "insensitive" as const } },
+              { destinationUrl: { contains: q, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    },
+  };
+}
+
+async function countLinksCached(where: object, cacheKey: string): Promise<number> {
+  try {
+    const redis = getRedis();
+    const hit = await redis.get(RedisKeys.linksListTotal(cacheKey));
+    if (hit) return Number(hit);
+  } catch {
+    // ignore
+  }
+  const total = await prisma.link.count({ where });
+  try {
+    const redis = getRedis();
+    await redis.set(RedisKeys.linksListTotal(cacheKey), String(total), "EX", COUNT_CACHE_TTL);
+  } catch {
+    // ignore
+  }
+  return total;
+}
 
 export default async function LinksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; q?: string; status?: string }>;
 }) {
   const session = await getAppSession();
   const canEdit = session?.user?.role ? can(session.user.role, Permissions.editLinks) : false;
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const skip = (page - 1) * PAGE_SIZE;
+  const { q, status, where } = buildLinksQuery(sp);
+
+  const cacheKey = createHash("sha256").update(JSON.stringify(where)).digest("hex").slice(0, 16);
 
   const [links, total] = await Promise.all([
     prisma.link.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       take: PAGE_SIZE,
       skip,
       include: { campaign: { select: { name: true } } },
     }),
-    prisma.link.count(),
+    countLinksCached(where, cacheKey),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const querySuffix = (p: number) => {
+    const params = new URLSearchParams();
+    params.set("page", String(p));
+    if (q) params.set("q", q);
+    if (status) params.set("status", status);
+    return params.toString();
+  };
 
   return (
     <div className="space-y-6">
@@ -40,9 +100,7 @@ export default async function LinksPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Links</h1>
           <p className="text-muted-foreground">
-            Copy the tracked short URL (includes https and /go/). Instant redirect without a visit count: replace{" "}
-            <span className="font-mono">/go/</span> with <span className="font-mono">/r/</span> in the same host.
-            {canEdit ? " Use Pause or Edit URL to update redirects; changes apply within seconds." : null}
+            Search by slug or destination. Use <span className="font-mono">/r/</span> for instant redirects.
           </p>
         </div>
         {canEdit ? (
@@ -52,23 +110,43 @@ export default async function LinksPage({
         ) : null}
       </div>
 
+      <form method="get" className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <label htmlFor="q" className="text-xs font-medium text-muted-foreground">
+            Search
+          </label>
+          <Input id="q" name="q" defaultValue={q ?? ""} placeholder="slug or URL…" className="min-w-[220px]" />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="status" className="text-xs font-medium text-muted-foreground">
+            Status
+          </label>
+          <select
+            id="status"
+            name="status"
+            defaultValue={status ?? ""}
+            className="flex h-9 rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">All</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="PAUSED">PAUSED</option>
+          </select>
+        </div>
+        <Button type="submit" variant="secondary">
+          Filter
+        </Button>
+      </form>
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>Links</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages} · {total.toLocaleString()} total
+            Page {page} of {totalPages} · {total.toLocaleString()} matching
           </p>
         </CardHeader>
         <CardContent>
           {links.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-              <p className="text-sm text-muted-foreground">No links yet. Create your first short link.</p>
-              {canEdit ? (
-                <Button asChild>
-                  <Link href="/links/new">Create link</Link>
-                </Button>
-              ) : null}
-            </div>
+            <p className="py-8 text-center text-sm text-muted-foreground">No links match your filters.</p>
           ) : (
             <>
               <div className="overflow-x-auto">
@@ -110,12 +188,12 @@ export default async function LinksPage({
               <div className="mt-4 flex gap-2">
                 {page > 1 ? (
                   <Button variant="outline" size="sm" asChild>
-                    <Link href={`/links?page=${page - 1}`}>Previous</Link>
+                    <Link href={`/links?${querySuffix(page - 1)}`}>Previous</Link>
                   </Button>
                 ) : null}
                 {page < totalPages ? (
                   <Button variant="outline" size="sm" asChild>
-                    <Link href={`/links?page=${page + 1}`}>Next</Link>
+                    <Link href={`/links?${querySuffix(page + 1)}`}>Next</Link>
                   </Button>
                 ) : null}
               </div>

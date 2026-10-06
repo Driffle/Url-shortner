@@ -1,4 +1,5 @@
 import { prisma } from "@/server/db/prisma";
+import { bumpAnalyticsCacheVersion } from "@/server/redis/client";
 import { dayBucketStartUtc } from "@/server/services/click-event-build";
 import { runClickWorkerCycle } from "@/server/services/click-worker.service";
 
@@ -163,6 +164,8 @@ export async function runAnalyticsRollup(options?: { lookbackDays?: number }): P
     });
     campaignBucketsUpdated += 1;
   }
+
+  await bumpAnalyticsCacheVersion();
 
   console.log(
     JSON.stringify({
