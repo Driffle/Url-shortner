@@ -17,7 +17,7 @@
     "user:set-password": "node ./scripts/set-password.mjs",
     "test:unit": "tsx --test src/**/*.test.ts",
     "worker:clicks": "tsx scripts/click-worker.ts",
-    "test:regression": "sh ./scripts/regression-phase2.sh",
+    "test:regression": "sh ./scripts/regression-phase3.sh",
     "test:load": "sh ./scripts/load-test-phase1.sh",
     "postinstall": "prisma generate && node ./scripts/patch-auth-google-callback.mjs"
   },

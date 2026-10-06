@@ -1,147 +1,134 @@
 import Link from "next/link";
 import { prisma } from "@/server/db/prisma";
 import { analyticsRepository } from "@/server/repositories/analytics-repository";
+import { AnalyticsToolbar } from "@/features/analytics/components/analytics-toolbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { ClickTrendChart } from "@/features/analytics/components/click-trend-chart";
-import { Button } from "@/shared/ui/button";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
 import { getEnv } from "@/shared/validations/env";
+import {
+  analyticsRangeQueryString,
+  resolveAnalyticsRange,
+  type AnalyticsRangePreset,
+} from "@/shared/lib/analytics-date-range";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ slug?: string }>;
+  searchParams: Promise<{ slug?: string; range?: string; from?: string; to?: string }>;
 }) {
   const sp = await searchParams;
   const slugRaw = sp.slug?.trim();
   const slug = slugRaw ? slugRaw.toLowerCase() : undefined;
 
-  const filteredLink = slug
+  const resolved = resolveAnalyticsRange({
+    range: sp.range,
+    from: sp.from,
+    to: sp.to,
+    defaultPreset: "30d",
+  });
+
+  if (!resolved.ok) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {resolved.error}
+        </p>
+        <Link href="/analytics" className="text-sm text-primary underline">
+          Reset filters
+        </Link>
+      </div>
+    );
+  }
+
+  const { from, to, label, preset } = resolved.value;
+  const scopeLink = slug
     ? await prisma.link.findUnique({
         where: { slug },
         select: { id: true, slug: true, destinationUrl: true, clickCount: true, visitCount: true },
       })
     : null;
 
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - 30);
-  const scope = filteredLink ? { linkId: filteredLink.id } : undefined;
+  const scope = scopeLink ? { linkId: scopeLink.id } : undefined;
 
-  const clickWindowWhere = {
-    createdAt: { gte: since },
-    isBot: false,
-    ...(filteredLink ? { linkId: filteredLink.id } : {}),
-  } as const;
-
-  const [series, refAgg, deviceAgg, windowClicks, linkChoices] = await Promise.all([
-    analyticsRepository.clicksByDaySince(since, scope),
-    prisma.clickEvent.groupBy({
-      by: ["referrerId"],
-      _count: { _all: true },
-      where: { ...clickWindowWhere, referrerId: { not: null } },
-    }),
-    prisma.clickEvent.groupBy({
-      by: ["deviceId"],
-      _count: { _all: true },
-      where: clickWindowWhere,
-    }),
-    prisma.clickEvent.count({ where: clickWindowWhere }),
-    prisma.link.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 80,
-      select: { id: true, slug: true, destinationUrl: true },
-    }),
+  const [series, metrics, referrers, devices] = await Promise.all([
+    analyticsRepository.clicksByDayInRange(from, to, scope),
+    analyticsRepository.rangeMetrics(from, to, scope),
+    analyticsRepository.topReferrersInRange(from, to, scope, 8),
+    analyticsRepository.deviceMixInRange(from, to, scope, 8),
   ]);
 
-  const refSorted = [...refAgg].sort((a, b) => b._count._all - a._count._all).slice(0, 8);
-  const devSorted = [...deviceAgg].sort((a, b) => b._count._all - a._count._all).slice(0, 8);
-
-  const referrerIds = refSorted.map((r) => r.referrerId).filter(Boolean) as string[];
-  const deviceIds = devSorted.map((d) => d.deviceId).filter(Boolean) as string[];
-
-  const [referrers, devices] = await Promise.all([
-    referrerIds.length
-      ? prisma.referrer.findMany({ where: { id: { in: referrerIds } } })
-      : [],
-    deviceIds.length ? prisma.device.findMany({ where: { id: { in: deviceIds } } }) : [],
-  ]);
-
-  const refMap = Object.fromEntries(referrers.map((r) => [r.id, r.domain]));
-  const devMap = Object.fromEntries(devices.map((d) => [d.id, `${d.deviceType} · ${d.browserName ?? "?"}`]));
+  const cacheTtl = getEnv().ANALYTICS_CACHE_TTL_SEC;
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground">Rollup-backed trends and dimensional breakdowns.</p>
+          <p className="text-muted-foreground">
+            {label} (UTC) · rollup-backed reads · cache TTL {cacheTtl}s
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Clicks may lag ~1 min until the worker ingests; rollups refresh on cron. Unique visitors sum daily
+            buckets{scope ? "" : " (not deduplicated across links)"}.
+          </p>
         </div>
-
-        <form method="get" className="flex flex-wrap items-end gap-2">
-          <div className="space-y-1">
-            <label htmlFor="slug" className="text-xs font-medium text-muted-foreground">
-              Filter by short link
-            </label>
-            <select
-              id="slug"
-              name="slug"
-              defaultValue={slug ?? ""}
-              className="flex h-9 min-w-[220px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="">All links</option>
-              {linkChoices.map((l) => (
-                <option key={l.id} value={l.slug}>
-                  {l.slug} — {l.destinationUrl.slice(0, 48)}
-                  {l.destinationUrl.length > 48 ? "…" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button type="submit" variant="secondary">
-            Apply
-          </Button>
-          {slug ? (
-            <Button type="button" variant="outline" asChild>
-              <Link href="/analytics">Clear</Link>
-            </Button>
-          ) : null}
-        </form>
+        <AnalyticsToolbar
+          range={preset as AnalyticsRangePreset}
+          from={sp.from}
+          to={sp.to}
+          slug={slug}
+          initialSlugLabel={scopeLink?.slug}
+        />
       </div>
 
-      {slug && !filteredLink ? (
+      {slug && !scopeLink ? (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          No link found for slug <span className="font-mono">{slugRaw}</span>. Choose another from the list.
+          No link found for slug <span className="font-mono">{slugRaw}</span>.
         </p>
       ) : null}
 
-      {filteredLink ? (
+      <Card>
+        <CardHeader>
+          <CardTitle>Range summary</CardTitle>
+          <CardDescription>
+            Total and unique clicks from daily rollups
+            {scopeLink ? ` · ${scopeLink.slug}` : " · all links"}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-6 text-sm">
+          <div>
+            <p className="text-muted-foreground">Total clicks</p>
+            <p className="text-2xl font-semibold">{metrics.totalClicks.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Unique clicks (rollup)</p>
+            <p className="text-2xl font-semibold">{metrics.uniqueClicks.toLocaleString()}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {scopeLink ? (
         <Card>
           <CardHeader>
             <CardTitle>Selected short URL</CardTitle>
             <CardDescription>
-              Use this exact URL in browsers and campaigns. A <strong>click</strong> is recorded when{" "}
-              <span className="font-mono">/r/…</span> redirects or when <span className="font-mono">/go/…</span> loads
-              (before dwell). A <strong>visit</strong> is counted only after {getEnv().VISIT_HOLD_SECONDS}s on{" "}
-              <span className="font-mono">/go/…</span>, then redirect to the destination.
+              Lifetime counters ·{" "}
+              <Link
+                href={`/analytics?${analyticsRangeQueryString(resolved.value, scopeLink.slug)}`}
+                className="text-primary underline"
+              >
+                Share this view
+              </Link>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="break-all font-mono text-base font-medium text-primary">{publicShortUrl(filteredLink.slug)}</p>
+            <p className="break-all font-mono text-base font-medium text-primary">{publicShortUrl(scopeLink.slug)}</p>
             <p className="text-muted-foreground">
-              <span className="font-medium text-foreground">Destination:</span>{" "}
-              <span className="break-all">{filteredLink.destinationUrl}</span>
-            </p>
-            <p className="text-muted-foreground">
-              Lifetime clicks (counter):{" "}
-              <span className="font-medium text-foreground">{filteredLink.clickCount.toLocaleString()}</span>
-              {" · "}
-              Visits (completed {getEnv().VISIT_HOLD_SECONDS}s dwell on /go/…):{" "}
-              <span className="font-medium text-foreground">{filteredLink.visitCount.toLocaleString()}</span>
-              {" · "}
-              Non-bot clicks in last 30 days:{" "}
-              <span className="font-medium text-foreground">{windowClicks.toLocaleString()}</span>
+              Lifetime clicks: {scopeLink.clickCount.toLocaleString()} · Visits: {scopeLink.visitCount.toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -150,10 +137,7 @@ export default async function AnalyticsPage({
       <Card>
         <CardHeader>
           <CardTitle>Click trend</CardTitle>
-          <CardDescription>
-            Last 30 days, daily buckets from link-level rollups
-            {filteredLink ? ` — ${filteredLink.slug} only` : " — all links combined"}.
-          </CardDescription>
+          <CardDescription>Daily buckets — {label}</CardDescription>
         </CardHeader>
         <CardContent className="h-80">
           <ClickTrendChart data={series} />
@@ -164,32 +148,40 @@ export default async function AnalyticsPage({
         <Card>
           <CardHeader>
             <CardTitle>Top referrers</CardTitle>
-            <CardDescription>Non-bot clicks in window{filteredLink ? ` · ${filteredLink.slug}` : ""}.</CardDescription>
+            <CardDescription>Rollup merge · {label}</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2 text-sm">
-              {refSorted.map((r) => (
-                <li key={r.referrerId ?? "x"} className="flex justify-between gap-2">
-                  <span className="truncate">{r.referrerId ? refMap[r.referrerId] ?? r.referrerId : "—"}</span>
-                  <span className="text-muted-foreground">{r._count._all}</span>
-                </li>
-              ))}
+              {referrers.length === 0 ? (
+                <li className="text-muted-foreground">No data in range.</li>
+              ) : (
+                referrers.map((r) => (
+                  <li key={r.domain} className="flex justify-between gap-2">
+                    <span className="truncate">{r.domain}</span>
+                    <span className="text-muted-foreground">{r.count}</span>
+                  </li>
+                ))
+              )}
             </ul>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
             <CardTitle>Device mix</CardTitle>
-            <CardDescription>Top device fingerprints in window{filteredLink ? ` · ${filteredLink.slug}` : ""}.</CardDescription>
+            <CardDescription>Rollup merge · {label}</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2 text-sm">
-              {devSorted.map((d) => (
-                <li key={d.deviceId ?? "x"} className="flex justify-between gap-2">
-                  <span className="truncate">{d.deviceId ? devMap[d.deviceId] ?? d.deviceId : "—"}</span>
-                  <span className="text-muted-foreground">{d._count._all}</span>
-                </li>
-              ))}
+              {devices.length === 0 ? (
+                <li className="text-muted-foreground">No data in range.</li>
+              ) : (
+                devices.map((d) => (
+                  <li key={d.deviceType} className="flex justify-between gap-2">
+                    <span className="truncate">{d.deviceType}</span>
+                    <span className="text-muted-foreground">{d.count}</span>
+                  </li>
+                ))
+              )}
             </ul>
           </CardContent>
         </Card>

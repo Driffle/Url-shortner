@@ -16,8 +16,12 @@ const routes = [
   { label: "Settings", value: "/settings" },
 ];
 
+type LinkHit = { slug: string; destinationUrl: string };
+
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [links, setLinks] = useState<LinkHit[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -32,9 +36,25 @@ export function CommandMenu() {
     return () => window.removeEventListener("keydown", down);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const q = search.trim();
+    if (q.length < 2) {
+      setLinks([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      void fetch(`/api/links/search?q=${encodeURIComponent(q)}&limit=20`)
+        .then((r) => (r.ok ? r.json() : { links: [] }))
+        .then((d: { links: LinkHit[] }) => setLinks(d.links ?? []));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [search, open]);
+
   const onSelect = useCallback(
     (value: string) => {
       setOpen(false);
+      setSearch("");
       router.push(value);
     },
     [router],
@@ -46,12 +66,12 @@ export function CommandMenu() {
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "flex h-9 w-full max-w-sm items-center gap-2 rounded-md border border-blue-100 bg-white px-3 text-left text-sm text-slate-500 shadow-sm ring-blue-50 transition hover:border-blue-200 hover:ring-2",
+          "flex h-9 w-full max-w-sm items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 text-left text-sm text-white/80 shadow-sm transition hover:bg-white/15",
         )}
       >
         <Search className="h-4 w-4" />
         Search…
-        <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
+        <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-1 rounded border border-white/20 bg-white/10 px-1.5 font-mono text-[10px] font-medium text-white/70">
           ⌘K
         </kbd>
       </button>
@@ -61,35 +81,49 @@ export function CommandMenu() {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/35 p-4 pt-[15vh]" role="dialog">
       <Command
-        className="w-full max-w-lg overflow-hidden rounded-lg border border-blue-100 bg-white text-slate-900 shadow-xl shadow-blue-900/10"
+        className="w-full max-w-lg overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-xl"
         shouldFilter
         loop
       >
         <div className="flex items-center border-b px-3">
           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
           <Command.Input
-            placeholder="Go to…"
+            placeholder="Go to or search links…"
+            value={search}
+            onValueChange={setSearch}
             className="flex h-12 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
         <Command.List className="max-h-72 overflow-y-auto p-2">
           <Command.Empty className="py-6 text-center text-sm text-muted-foreground">No results.</Command.Empty>
+          {links.length > 0 ? (
+            <Command.Group heading="Links">
+              {links.map((l) => (
+                <Command.Item
+                  key={l.slug}
+                  value={`${l.slug} ${l.destinationUrl}`}
+                  onSelect={() => onSelect(`/analytics?slug=${l.slug}&range=7d`)}
+                  className="flex cursor-pointer select-none flex-col items-start rounded-md px-2 py-2 text-sm aria-selected:bg-accent"
+                >
+                  <span className="font-mono">{l.slug}</span>
+                  <span className="truncate text-xs text-muted-foreground">{l.destinationUrl}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+          ) : null}
           <Command.Group heading="Navigation">
             {routes.map((r) => (
               <Command.Item
                 key={r.value}
                 value={`${r.label} ${r.value}`}
                 onSelect={() => onSelect(r.value)}
-                className="flex cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm aria-selected:bg-blue-50 aria-selected:text-blue-900"
+                className="flex cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm aria-selected:bg-accent"
               >
                 {r.label}
               </Command.Item>
             ))}
           </Command.Group>
         </Command.List>
-        <button type="button" className="sr-only" onClick={() => setOpen(false)}>
-          Close
-        </button>
       </Command>
       <button type="button" className="fixed inset-0 -z-10 cursor-default" aria-label="Close" onClick={() => setOpen(false)} />
     </div>

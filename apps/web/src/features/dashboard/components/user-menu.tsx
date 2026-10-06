@@ -17,7 +17,7 @@ export function UserMenu() {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="sm" className="gap-2 border-white/20 bg-transparent text-white hover:bg-white/10 hover:text-white">
           <User className="h-4 w-4" />
           <span className="hidden max-w-[140px] truncate sm:inline">{data.user.email}</span>
         </Button>

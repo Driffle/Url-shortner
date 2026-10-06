@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   Link2,
@@ -25,34 +24,29 @@ const items = [
 export function AppSidebar() {
   const pathname = usePathname();
   return (
-    <aside className="hidden w-56 shrink-0 border-r border-blue-100 bg-white shadow-sm md:flex md:flex-col">
-      <div className="flex h-14 items-center border-b border-blue-100 bg-gradient-to-r from-blue-600 to-blue-700 px-4">
+    <aside className="hidden h-full w-56 shrink-0 flex-col overflow-hidden border-r border-white/10 bg-[#191818] md:flex">
+      <div className="flex h-14 shrink-0 items-center border-b border-white/10 px-4">
         <Link href="/dashboard" className="text-sm font-semibold tracking-tight text-white">
           Driffle Links
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 p-2">
+      <nav className="min-h-0 flex-1 overflow-y-auto p-2">
         {items.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href} className="relative block rounded-md px-3 py-2 text-sm">
-              {active && (
-                <motion.span
-                  layoutId="nav-pill"
-                  className="absolute inset-0 rounded-md bg-blue-50 ring-1 ring-blue-100"
-                  transition={{ type: "spring", stiffness: 400, damping: 35 }}
-                />
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "relative mb-0.5 flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+                active
+                  ? "bg-white/10 font-medium text-white before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:bg-white"
+                  : "text-white/70 hover:bg-white/5 hover:text-white",
               )}
-              <span
-                className={cn(
-                  "relative flex items-center gap-2",
-                  active ? "font-medium text-blue-800" : "text-slate-600 hover:text-blue-700",
-                )}
-              >
-                <Icon className={cn("h-4 w-4", active ? "text-blue-600" : "text-slate-400")} />
-                {item.label}
-              </span>
+            >
+              <Icon className={cn("h-4 w-4", active ? "text-white" : "text-white/50")} />
+              {item.label}
             </Link>
           );
         })}
