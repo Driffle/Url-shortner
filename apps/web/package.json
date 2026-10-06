@@ -16,6 +16,9 @@
     "db:studio": "prisma studio",
     "user:set-password": "node ./scripts/set-password.mjs",
     "test:unit": "tsx --test src/**/*.test.ts",
+    "worker:clicks": "tsx scripts/click-worker.ts",
+    "test:regression": "sh ./scripts/regression-phase1.sh",
+    "test:load": "sh ./scripts/load-test-phase1.sh",
     "postinstall": "prisma generate && node ./scripts/patch-auth-google-callback.mjs"
   },
   "dependencies": {
@@ -47,7 +50,8 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^3.24.1",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
@@ -60,7 +64,6 @@
     "postcss": "^8.4.49",
     "prisma": "^6.3.0",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }

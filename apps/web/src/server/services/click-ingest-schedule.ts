@@ -1,35 +1,34 @@
 import { after } from "next/server";
-import { getRedis, RedisKeys } from "@/server/redis/client";
-import { clickIngestService } from "@/server/services/click-ingest.service";
+import { enqueueClickEvent, enqueueClickEventLegacyFallback } from "@/server/services/click-enqueue.service";
 import type { RedirectRequestMeta } from "@/server/services/redirect-resolve.service";
 
-/** Non-blocking click ingest after redirect response (see `after()`). */
+/** Non-blocking click enqueue after redirect response (see `after()`). Postgres writes happen in the worker. */
 export function scheduleClickIngest(linkId: string, meta: RedirectRequestMeta): void {
   after(async () => {
+    const started = performance.now();
     try {
-      await clickIngestService.ingest({
-        linkId,
-        ip: meta.ip,
-        userAgent: meta.userAgent,
-        referer: meta.referer,
-        countryCode: meta.countryCode,
-      });
+      const { eventId, durationMs } = await enqueueClickEvent(linkId, meta);
+      console.log(
+        JSON.stringify({
+          event: "click_enqueue",
+          linkId,
+          eventId,
+          durationMs,
+          cacheHit: null,
+        }),
+      );
     } catch {
       try {
-        const redis = getRedis();
-        await redis.lpush(
-          RedisKeys.clickQueue(),
+        await enqueueClickEventLegacyFallback(linkId, meta);
+        console.log(
           JSON.stringify({
+            event: "click_enqueue_fallback",
             linkId,
-            ip: meta.ip,
-            userAgent: meta.userAgent,
-            referer: meta.referer,
-            country: meta.countryCode,
-            at: new Date().toISOString(),
+            durationMs: Math.round(performance.now() - started),
           }),
         );
       } catch {
-        // best-effort queue buffer
+        // best-effort buffer
       }
     }
   });
