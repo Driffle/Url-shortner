@@ -38,6 +38,9 @@ if [[ "$dash" == "200" ]]; then pass "GET /dashboard -> 200"; else fail "dashboa
 analytics_camp=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/analytics?range=7d&campaignId=nonexistent")
 if [[ "$analytics_camp" == "200" ]]; then pass "GET /analytics?campaignId=… -> 200"; else fail "analytics campaign $analytics_camp"; fi
 
+share_pub=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/share/analytics/reg-e6c90862?range=7d")
+if [[ "$share_pub" == "200" ]] || [[ "$share_pub" == "404" ]]; then pass "GET /share/analytics/[slug] (public) -> $share_pub"; else fail "public share $share_pub"; fi
+
 rollup=$(curl -sS -o /tmp/rbump.json -w "%{http_code}" -X POST "$BASE/api/cron/rollup?lookbackDays=3" \
   -H "Authorization: Bearer $CRON_SECRET")
 if [[ "$rollup" == "200" ]]; then pass "rollup triggers cache version bump path"; else fail "rollup $rollup"; fi
