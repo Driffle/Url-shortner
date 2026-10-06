@@ -1,5 +1,8 @@
+"use client";
+
 import { Info } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 
 type Props = {
   text: string;
@@ -7,19 +10,25 @@ type Props = {
   label?: string;
 };
 
-/** Accessible hint: visible on hover/focus via native `title`. */
+/** Hint shown in a custom tooltip (~100ms open delay via root provider). */
 export function InfoTip({ text, className, label = "More information" }: Props) {
   return (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
-        className,
-      )}
-      title={text}
-      aria-label={label}
-    >
-      <Info className="h-4 w-4" />
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
+            className,
+          )}
+          aria-label={label}
+        >
+          <Info className="h-4 w-4" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="start">
+        {text}
+      </TooltipContent>
+    </Tooltip>
   );
 }

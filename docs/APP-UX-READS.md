@@ -23,7 +23,8 @@ See [Issue #36](https://github.com/Driffle/Url-shortner/issues/36).
 
 | Page | Params |
 |------|--------|
-| Analytics | `range`, `from`, `to`, `slug` |
+| Analytics | `range`, `from`, `to`, `slug`, `campaignId` |
+| Public share | `/share/analytics/{slug}?range=…` (no login; slug fixed in path) |
 | Dashboard | `range` (default `14d`) |
 | Links | `q`, `status`, `page` |
 | Campaigns | `page` |
