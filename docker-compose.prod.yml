@@ -7,14 +7,14 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+        DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@${DATABASE_HOST:-db}:5432/driffle_links?schema=public&connection_limit=${PRISMA_CONNECTION_LIMIT:-10}
     image: driffle-links-web:latest
     restart: unless-stopped
     ports:
       - "${WEB_PUBLISH_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@${DATABASE_HOST:-db}:5432/driffle_links?schema=public&connection_limit=${PRISMA_CONNECTION_LIMIT:-10}
       REDIS_URL: redis://redis:6379
       REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-dl}
       # Required for Google OAuth redirect_uri (Deployer must set these, or defaults below apply).
@@ -64,12 +64,12 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+        DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@${DATABASE_HOST:-db}:5432/driffle_links?schema=public&connection_limit=${PRISMA_CONNECTION_LIMIT:-10}
     restart: unless-stopped
     command: ["npx", "tsx", "scripts/click-worker.ts"]
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@${DATABASE_HOST:-db}:5432/driffle_links?schema=public&connection_limit=${PRISMA_CONNECTION_LIMIT:-10}
       REDIS_URL: redis://redis:6379
       REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-dl}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-${AUTH_SECRET:-01234567890123456789012345678901}}
@@ -85,6 +85,25 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # Optional: `docker compose --profile pooling up` — point DATABASE_HOST=pgbouncer and add `pgbouncer=true` to DATABASE_URL for Prisma.
+  pgbouncer:
+    profiles: ["pooling"]
+    image: edoburu/pgbouncer:1.22.1-p0
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: driffle_links
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 20
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "6432:6432"
 
   db:
     image: postgres:16-alpine
@@ -105,7 +124,16 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--maxmemory",
+        "${REDIS_MAXMEMORY:-256mb}",
+        "--maxmemory-policy",
+        "volatile-lru",
+      ]
     volumes:
       - driffle_links_redis:/data
     healthcheck:

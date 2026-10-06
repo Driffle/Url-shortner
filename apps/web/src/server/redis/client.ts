@@ -35,4 +35,5 @@ export const RedisKeys = {
   clickFeed: () => redisKey("feed:clicks"),
   clickQueue: () => redisKey("queue:clicks"),
   clickStream: () => redisKey("stream:clicks"),
+  slugLoadLock: (slug: string) => redisKey(`slug:lock:${slug.toLowerCase()}`),
 } as const;

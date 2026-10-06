@@ -115,6 +115,11 @@ const envSchema = z
     /** Redirect rate limit: requests per slug per 60s window (default 2000). */
     REDIRECT_RL_SLUG_PER_MIN: z.string().optional(),
 
+    /** Raw `ClickEvent` retention in days (default 180). Rollups kept. */
+    CLICK_EVENT_RETENTION_DAYS: z.string().optional(),
+    /** Analytics read cache TTL seconds (default 300). */
+    ANALYTICS_CACHE_TTL_SEC: z.string().optional(),
+
     ALLOWED_EMAIL_DOMAIN: z.string().default("driffle.com"),
 
     PUBLIC_APP_URL: z.preprocess(
@@ -189,12 +194,26 @@ const envSchema = z
       if (Number.isNaN(n)) return fallback;
       return Math.min(max, Math.max(1, n));
     };
+    let retentionDays = 180;
+    const retRaw = data.CLICK_EVENT_RETENTION_DAYS?.trim();
+    if (retRaw) {
+      const n = parseInt(retRaw, 10);
+      if (!Number.isNaN(n)) retentionDays = Math.min(730, Math.max(30, n));
+    }
+    let analyticsCacheTtl = 300;
+    const cacheRaw = data.ANALYTICS_CACHE_TTL_SEC?.trim();
+    if (cacheRaw) {
+      const n = parseInt(cacheRaw, 10);
+      if (!Number.isNaN(n)) analyticsCacheTtl = Math.min(3600, Math.max(30, n));
+    }
     return {
       ...data,
       NEXTAUTH_SECRET: resolved,
       VISIT_HOLD_SECONDS: visitHold,
       REDIRECT_RL_IP_PER_MIN: parseRl(data.REDIRECT_RL_IP_PER_MIN, 300, 50_000),
       REDIRECT_RL_SLUG_PER_MIN: parseRl(data.REDIRECT_RL_SLUG_PER_MIN, 2000, 500_000),
+      CLICK_EVENT_RETENTION_DAYS: retentionDays,
+      ANALYTICS_CACHE_TTL_SEC: analyticsCacheTtl,
     };
   });
 

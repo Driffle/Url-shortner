@@ -1,11 +1,17 @@
 import { prisma } from "@/server/db/prisma";
+import { getRedis, RedisKeys } from "@/server/redis/client";
 import { RollupGranularity } from "@prisma/client";
+import { getEnv } from "@/shared/validations/env";
 
 export type AnalyticsScope = { linkId?: string };
 
 export class AnalyticsRepository {
   /** Daily click totals from link rollups; pass `linkId` to scope to one short URL. */
   async clicksByDaySince(since: Date, scope?: AnalyticsScope): Promise<{ day: string; clicks: number }[]> {
+    const cacheKey = this.cacheKey("clicksByDay", since, scope?.linkId);
+    const cached = await this.getCached<{ day: string; clicks: number }[]>(cacheKey);
+    if (cached) return cached;
+
     const rows = await prisma.analyticsRollup.groupBy({
       by: ["bucketStart"],
       where: {
@@ -17,19 +23,27 @@ export class AnalyticsRepository {
       _sum: { totalClicks: true },
       orderBy: { bucketStart: "asc" },
     });
-    return rows.map((r) => ({
+    const result = rows.map((r) => ({
       day: r.bucketStart.toISOString().slice(0, 10),
       clicks: r._sum.totalClicks ?? 0,
     }));
+    await this.setCached(cacheKey, result);
+    return result;
   }
 
   async topCampaigns(limit = 5) {
+    const cacheKey = this.cacheKey("topCampaigns", new Date(0), String(limit));
+    const cached = await this.getCached<
+      { id: string; name: string; linkCount: number; clicks: number }[]
+    >(cacheKey);
+    if (cached) return cached;
+
     const campaigns = await prisma.campaign.findMany({
       take: 40,
       where: { archivedAt: null },
       include: { links: { select: { clickCount: true } } },
     });
-    return campaigns
+    const result = campaigns
       .map((c) => ({
         id: c.id,
         name: c.name,
@@ -38,6 +52,8 @@ export class AnalyticsRepository {
       }))
       .sort((a, b) => b.clicks - a.clicks)
       .slice(0, limit);
+    await this.setCached(cacheKey, result);
+    return result;
   }
 
   async recentClicks(limit = 20, scope?: AnalyticsScope) {
@@ -52,6 +68,33 @@ export class AnalyticsRepository {
         countryCode: true,
       },
     });
+  }
+
+  private cacheKey(kind: string, since: Date, scopeId?: string): string {
+    const day = since.toISOString().slice(0, 10);
+    const scope = scopeId ?? "all";
+    return RedisKeys.analyticsSummary(scope, `${kind}:${day}`);
+  }
+
+  private async getCached<T>(key: string): Promise<T | null> {
+    try {
+      const redis = getRedis();
+      const raw = await redis.get(key);
+      if (!raw) return null;
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  private async setCached<T>(key: string, value: T): Promise<void> {
+    try {
+      const redis = getRedis();
+      const ttl = getEnv().ANALYTICS_CACHE_TTL_SEC;
+      await redis.set(key, JSON.stringify(value), "EX", ttl);
+    } catch {
+      // cache optional
+    }
   }
 }
 
