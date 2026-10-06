@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { analyticsRepository } from "@/server/repositories/analytics-repository";
 import { AnalyticsLinkReport } from "@/features/analytics/components/analytics-link-report";
-import { resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
+import { ShareAnalyticsRangeToolbar } from "@/features/analytics/components/share-analytics-range-toolbar";
+import { resolveAnalyticsRange, type AnalyticsRangePreset } from "@/shared/lib/analytics-date-range";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export default async function PublicAnalyticsSharePage({
     );
   }
 
-  const { from, to, label } = resolved.value;
+  const { from, to, label, preset } = resolved.value;
 
   const link = await prisma.link.findUnique({
     where: { slug },
@@ -61,6 +62,13 @@ export default async function PublicAnalyticsSharePage({
         <h1 className="font-mono text-2xl font-semibold tracking-tight">{link.slug}</h1>
         <p className="text-sm text-muted-foreground">Read-only analytics for this short link. Slug cannot be changed on this page.</p>
       </header>
+
+      <ShareAnalyticsRangeToolbar
+        slug={link.slug}
+        range={preset as AnalyticsRangePreset}
+        from={sp.from}
+        to={sp.to}
+      />
 
       <AnalyticsLinkReport
         label={label}
