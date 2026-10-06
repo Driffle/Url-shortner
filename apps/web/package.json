@@ -12,6 +12,7 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:baseline-init": "sh ./scripts/baseline-existing-production-db.sh",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "user:set-password": "node ./scripts/set-password.mjs",

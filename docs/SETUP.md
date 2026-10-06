@@ -116,7 +116,7 @@ Open **http://127.0.0.1:3000** (matches the default dev script hostname).
    docker compose -f docker-compose.prod.yml up -d
    ```
 
-3. **Schema on Postgres:** the production image runs **`npx prisma db push`** once on container start (before `next start`) so tables such as `User` exist on a fresh volume. To skip that (e.g. you run `prisma migrate deploy` from CI or a job), set **`SKIP_PRISMA_PUSH=1`** in `.env`. If you later add SQL migrations under `prisma/migrations`, prefer **`migrate deploy`** instead of `db push` and use `SKIP_PRISMA_PUSH=1` plus a migration step.
+3. **Schema on Postgres:** production uses **`prisma/migrations`** (see Phase 0). Migrations run only when **`RUN_MIGRATE_ON_START=1`** in the web service env (see `apps/web/scripts/docker-entrypoint.sh`). For an **existing** Deployer database that was created with **`db push`**, run a **one-time baseline** before enabling migrate-on-start — **[DEPLOYER-MIGRATIONS.md](./DEPLOYER-MIGRATIONS.md)**. Fresh volumes: deploy then `npx prisma migrate deploy` (or set `RUN_MIGRATE_ON_START=1` once).
 
 Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`db`** and **`redis`** — see `.env.example`. Set **`REDIS_KEY_PREFIX`** if your Redis ACL only allows a specific key prefix.
 
@@ -130,7 +130,7 @@ Inside Docker Compose, **`DATABASE_URL`** and **`REDIS_URL`** use hostnames **`d
 | Short links return **404** / redirect never runs | Often Redis errors during rate limit or slug cache — fix Redis ACL / prefix first; then confirm the slug exists in the DB. |
 | `Invalid environment` on first Redis/redirect use | Missing or short auth secret (32+ chars), bad URLs, or — if **sign-in is on** — empty `GOOGLE_*`. With no-login flags set, `GOOGLE_*` may be empty. |
 | `[auth][error] MissingSecret` in Docker / production logs | Set **`NEXTAUTH_SECRET`** or **`AUTH_SECRET`** (32+ random chars) on the container. Open-access mode still loads NextAuth for `/api/auth/session` — the secret is required. With Compose, set one in root `.env`; `docker-compose.prod.yml` mirrors it into both env names. |
-| `The table public.User does not exist` (Prisma `P2021`) | Fresh DB with no schema: rebuild/restart the **`web`** image so startup runs `prisma db push`, or run `docker compose ... exec web npx prisma db push` once. If you set **`SKIP_PRISMA_PUSH=1`**, apply migrations / push yourself. |
+| `The table public.User does not exist` (Prisma `P2021`) | Fresh DB: run `docker compose ... exec web npx prisma migrate deploy` (or set `RUN_MIGRATE_ON_START=1` for one start). Existing prod with data: see **[DEPLOYER-MIGRATIONS.md](./DEPLOYER-MIGRATIONS.md)** — do not re-run init SQL. |
 | Cannot sign in with Google | Redirect URI mismatch, wrong `NEXTAUTH_URL`, or email not `@driffle.com` |
 | Port 3000 in use | Stop other process or set `PORT=3001 npm run dev` |
 

@@ -244,7 +244,7 @@ Multi-stage: `npm ci` → `prisma generate` → `next build` → `npm prune --om
 docker compose -f docker-compose.prod.yml run --rm web npx prisma migrate deploy
 ```
 
-Optional: set `RUN_MIGRATE_ON_START=1` on the web service to run `migrate deploy` on container start (prefer a one-off job when possible). Local dev may still use `prisma migrate dev` or `db push` for prototypes.
+Optional: set `RUN_MIGRATE_ON_START=1` on the web service to run `migrate deploy` on container start (prefer a one-off job when possible). **Existing Deployer DB from `db push`:** one-time baseline — [DEPLOYER-MIGRATIONS.md](./DEPLOYER-MIGRATIONS.md). Local dev may still use `prisma migrate dev` or `db push` for prototypes.
 
 **Redis connections:** one `ioredis` client per Node worker (`getRedis()` singleton); size Redis `maxclients` for `(web replicas × workers)`.
 

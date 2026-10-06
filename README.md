@@ -54,6 +54,8 @@ docker compose -f docker-compose.prod.yml up -d
 docker compose -f docker-compose.prod.yml exec web npx prisma migrate deploy
 ```
 
+**Existing Deployer DB (from `db push`):** baseline once — **[docs/DEPLOYER-MIGRATIONS.md](docs/DEPLOYER-MIGRATIONS.md)**.
+
 Details, security notes, and architecture: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 Kubernetes sizing for DevOps: **[docs/KUBERNETES-CAPACITY.md](docs/KUBERNETES-CAPACITY.md)**.
