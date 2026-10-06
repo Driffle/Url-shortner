@@ -58,6 +58,34 @@ services:
       retries: 3
       start_period: 60s
 
+  click-worker:
+    image: driffle-links-web:latest
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+    restart: unless-stopped
+    command: ["npx", "tsx", "scripts/click-worker.ts"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/driffle_links?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-dl}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-${AUTH_SECRET:-01234567890123456789012345678901}}
+      AUTH_SECRET: ${AUTH_SECRET:-${NEXTAUTH_SECRET:-01234567890123456789012345678901}}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://shortly.driffle.net}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-${NEXTAUTH_URL:-https://shortly.driffle.net}}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-build-placeholder}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-build-placeholder}
+    depends_on:
+      web:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped

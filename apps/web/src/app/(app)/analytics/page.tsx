@@ -121,8 +121,10 @@ export default async function AnalyticsPage({
           <CardHeader>
             <CardTitle>Selected short URL</CardTitle>
             <CardDescription>
-              Use this exact URL in browsers and campaigns. Visits are counted after {getEnv().VISIT_HOLD_SECONDS}s on the
-              interstitial page, then the user is sent to the destination.
+              Use this exact URL in browsers and campaigns. A <strong>click</strong> is recorded when{" "}
+              <span className="font-mono">/r/…</span> redirects or when <span className="font-mono">/go/…</span> loads
+              (before dwell). A <strong>visit</strong> is counted only after {getEnv().VISIT_HOLD_SECONDS}s on{" "}
+              <span className="font-mono">/go/…</span>, then redirect to the destination.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">

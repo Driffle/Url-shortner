@@ -143,8 +143,10 @@ sequenceDiagram
   end
   R-->>C: 302 Location
   R->>A: enqueue ingest
-  A->>PG: ClickEvent + rollup + counters
-  A->>Redis: LPUSH feed (trim)
+  A->>Redis: XADD stream (MAXLEN ~)
+  W[click-worker]-->Redis: XREADGROUP
+  W->>PG: batch ClickEvent + counters + rollup totalClicks
+  W->>Redis: LPUSH feed (trim)
 ```
 
 **Tradeoff:** True Edge colocation would need Redis over HTTP (for example Upstash) or a split “resolve” micro-endpoint. Here we optimize **self-hosted Docker** and **Prisma compatibility** over sub-10ms global Edge.
@@ -155,8 +157,10 @@ sequenceDiagram
 
 - **Parse**: referer domain, coarse UA classification, bot heuristic.
 - **Privacy**: store `visitorHash` = SHA-256 of `(NEXTAUTH_SECRET, dayBucket, ip, ua)` — no raw IP persisted.
-- **Write path**: transactional create `ClickEvent`, increment `Link.clickCount`, upsert `AnalyticsRollup` (`DAY`, `LINK`, `scopeId=linkId`).
-- **Unique clicks**: MVP stores full events; **`uniqueClicks` in rollup** reserved for cron recomputation (`POST /api/cron/rollup`).
+- **Hot path**: `XADD dl:stream:clicks` with JSON envelope (no Prisma on redirect).
+- **Worker path**: batch insert `ClickEvent`, increment `Link.clickCount`, upsert `AnalyticsRollup.totalClicks` (`DAY`, `LINK`).
+- **Unique clicks**: distinct `visitorHash` per UTC day bucket via `POST /api/cron/rollup` (and campaign scope).
+- **Metrics semantics**: **Click** = `/r/` redirect or `/go/` page load (enqueue). **Visit** = user completes dwell on `/go/` then `POST /api/visit`.
 
 ---
 
@@ -164,8 +168,8 @@ sequenceDiagram
 
 | Tier | What | Latency |
 |------|------|---------|
-| **Online** | Increment `AnalyticsRollup.totalClicks` per event | ms (same txn as click) |
-| **Scheduled** | Distinct `visitorHash` per day, campaign-level rollups, backfill queue | minutes |
+| **Online (worker)** | Increment `AnalyticsRollup.totalClicks` per ingested event | seconds (async) |
+| **Scheduled** | Distinct `visitorHash` per day, campaign-level rollups, drain legacy queue + stream backup | minutes |
 
 Cron contract: `Authorization: Bearer ${CRON_SECRET}`.
 
@@ -179,8 +183,9 @@ Cron contract: `Authorization: Bearer ${CRON_SECRET}`.
 | `dl:slug:miss:{slug}` | 60s | Negative cache for unknown slugs |
 | `dl:rl:ip:{ip}:{window}` | 60s | Redirect rate limit |
 | `dl:rl:slug:{slug}:{window}` | 60s | Abuse protection |
+| `dl:stream:clicks` | MAXLEN ~50k stream | Primary async click buffer (consumer group `click-workers`) |
 | `dl:feed:clicks` | list trim 200 | “Live” internal feed / future WS |
-| `dl:queue:clicks` | unbounded list | Failure buffer → worker |
+| `dl:queue:clicks` | list | Legacy failure buffer; worker drains on each cycle |
 
 **Analytics API caching (V2):** add `dl:analytics:link:{id}:{range}` in repository reads.
 
