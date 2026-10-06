@@ -10,6 +10,7 @@ import { Input } from "@/shared/ui/input";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
 import { can, Permissions } from "@/shared/lib/rbac";
 import { LinkRowActions } from "@/features/links/components/link-row-actions";
+import { LinkStatusBadge } from "@/shared/ui/status-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +19,19 @@ const COUNT_CACHE_TTL = 30;
 
 function buildLinksQuery(sp: { q?: string; status?: string; page?: string }) {
   const q = sp.q?.trim();
-  const statusRaw = sp.status?.trim().toUpperCase();
+  const statusRaw = (sp.status ?? "ACTIVE").trim().toUpperCase();
   const status =
-    statusRaw && Object.values(LinkStatus).includes(statusRaw as LinkStatus)
-      ? (statusRaw as LinkStatus)
-      : undefined;
+    statusRaw === "ALL"
+      ? undefined
+      : Object.values(LinkStatus).includes(statusRaw as LinkStatus)
+        ? (statusRaw as LinkStatus)
+        : LinkStatus.ACTIVE;
+  const statusFormValue = sp.status ?? "ACTIVE";
 
   return {
     q,
     status,
+    statusFormValue,
     where: {
       ...(status ? { status } : {}),
       ...(q
@@ -69,7 +74,7 @@ export default async function LinksPage({
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const skip = (page - 1) * PAGE_SIZE;
-  const { q, status, where } = buildLinksQuery(sp);
+  const { q, status, statusFormValue, where } = buildLinksQuery(sp);
 
   const cacheKey = createHash("sha256").update(JSON.stringify(where)).digest("hex").slice(0, 16);
 
@@ -90,7 +95,8 @@ export default async function LinksPage({
     const params = new URLSearchParams();
     params.set("page", String(p));
     if (q) params.set("q", q);
-    if (status) params.set("status", status);
+    if (statusFormValue === "ALL") params.set("status", "ALL");
+    else if (statusFormValue && statusFormValue !== "ACTIVE") params.set("status", statusFormValue);
     return params.toString();
   };
 
@@ -124,12 +130,13 @@ export default async function LinksPage({
           <select
             id="status"
             name="status"
-            defaultValue={status ?? ""}
+            defaultValue={statusFormValue}
             className="flex h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
-            <option value="">All</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="PAUSED">PAUSED</option>
+            <option value="ACTIVE">Active</option>
+            <option value="ALL">All</option>
+            <option value="PAUSED">Paused</option>
+            <option value="EXPIRED">Expired</option>
           </select>
         </div>
         <Button type="submit" variant="secondary">
@@ -158,7 +165,7 @@ export default async function LinksPage({
                       <th className="py-2 pr-4 font-medium">Campaign</th>
                       <th className="py-2 pr-4 font-medium">Clicks</th>
                       <th className="py-2 pr-4 font-medium">Status</th>
-                      {canEdit ? <th className="py-2 font-medium">Actions</th> : null}
+                      <th className="py-2 font-medium">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -168,18 +175,18 @@ export default async function LinksPage({
                         <td className="max-w-xs truncate py-3 pr-4">{l.destinationUrl}</td>
                         <td className="py-3 pr-4">{l.campaign?.name ?? "—"}</td>
                         <td className="py-3 pr-4">{l.clickCount.toLocaleString()}</td>
-                        <td className="py-3 pr-4">{l.status}</td>
-                        {canEdit ? (
-                          <td className="py-3">
-                            <LinkRowActions
-                              linkId={l.id}
-                              slug={l.slug}
-                              destinationUrl={l.destinationUrl}
-                              status={l.status}
-                              canEdit={canEdit}
-                            />
-                          </td>
-                        ) : null}
+                        <td className="py-3 pr-4">
+                          <LinkStatusBadge status={l.status} />
+                        </td>
+                        <td className="py-3">
+                          <LinkRowActions
+                            linkId={l.id}
+                            slug={l.slug}
+                            destinationUrl={l.destinationUrl}
+                            status={l.status}
+                            canEdit={canEdit}
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

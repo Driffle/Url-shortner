@@ -2,13 +2,13 @@
 
 Internal link management and campaign attribution for Driffle. This document is the single source of truth for system design, deployment, and evolution.
 
-**UI:** Authenticated **app shell** uses **dark chrome** (`#191818` sidebar + header) with a scrollable main column; login/redirect routes keep the light blue brand. See [APP-UX-READS.md](./APP-UX-READS.md) for cache TTL and URL filter params.
+**UI:** Authenticated shell uses **white + blue** (gradient brand bar, blue nav active state) with a viewport-locked scroll area. See [APP-UX-READS.md](./APP-UX-READS.md) for cache TTL and URL filter params.
 
 ### App shell layout
 
 - Root layout: `h-dvh overflow-hidden` flex chain so **only `<main>`** scrolls (`overflow-y: auto`).
-- Desktop: fixed sidebar; content header (command menu, user menu) stays visible.
-- Mobile (`md:hidden`): horizontal **pill nav** — primary routes remain reachable without the sidebar.
+- Desktop: fixed sidebar; sticky content header (command menu, user menu).
+- Mobile (`md:hidden`): horizontal **pill nav** on white chrome.
 
 ---
 

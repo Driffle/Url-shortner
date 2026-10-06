@@ -32,6 +32,12 @@ fi
 links_q=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/links?q=driffle&page=1")
 if [[ "$links_q" == "200" ]]; then pass "GET /links?q=… -> 200"; else fail "links search $links_q"; fi
 
+dash=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/dashboard")
+if [[ "$dash" == "200" ]]; then pass "GET /dashboard -> 200"; else fail "dashboard $dash"; fi
+
+analytics_camp=$(curl -sS -o /dev/null -w "%{http_code}" "$BASE/analytics?range=7d&campaignId=nonexistent")
+if [[ "$analytics_camp" == "200" ]]; then pass "GET /analytics?campaignId=… -> 200"; else fail "analytics campaign $analytics_camp"; fi
+
 rollup=$(curl -sS -o /tmp/rbump.json -w "%{http_code}" -X POST "$BASE/api/cron/rollup?lookbackDays=3" \
   -H "Authorization: Bearer $CRON_SECRET")
 if [[ "$rollup" == "200" ]]; then pass "rollup triggers cache version bump path"; else fail "rollup $rollup"; fi

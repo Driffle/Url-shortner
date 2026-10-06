@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { LinkStatus } from "@prisma/client";
+import { BarChart3, Pause, Pencil, Play } from "lucide-react";
 import { updateLinkAction } from "@/features/links/actions";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
+import { IconLinkButton } from "@/shared/ui/icon-link-button";
 
 type Props = {
   linkId: string;
@@ -22,8 +24,6 @@ export function LinkRowActions({ linkId, slug, status, destinationUrl, canEdit }
   const [editing, setEditing] = useState(false);
   const [destDraft, setDestDraft] = useState(destinationUrl);
 
-  if (!canEdit) return null;
-
   function runUpdate(input: { status?: LinkStatus; destinationUrl?: string }) {
     setError(null);
     start(async () => {
@@ -38,20 +38,56 @@ export function LinkRowActions({ linkId, slug, status, destinationUrl, canEdit }
   }
 
   return (
-    <div className="flex min-w-[12rem] flex-col items-end gap-2">
-      <div className="flex flex-wrap justify-end gap-1">
-        {status === "ACTIVE" ? (
-          <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => runUpdate({ status: "PAUSED" })}>
-            Pause
-          </Button>
-        ) : status === "PAUSED" ? (
-          <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => runUpdate({ status: "ACTIVE" })}>
-            Resume
-          </Button>
+    <div className="flex min-w-[6rem] flex-col items-end gap-2">
+      <div className="flex items-center justify-end gap-0.5">
+        <IconLinkButton
+          href={`/analytics?slug=${encodeURIComponent(slug)}&range=30d`}
+          icon={BarChart3}
+          label={`Analytics for ${slug}`}
+        />
+        {canEdit ? (
+          <>
+            {status === "ACTIVE" ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={pending}
+                title="Pause link"
+                aria-label={`Pause ${slug}`}
+                onClick={() => runUpdate({ status: "PAUSED" })}
+              >
+                <Pause className="h-4 w-4" />
+              </Button>
+            ) : status === "PAUSED" ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                disabled={pending}
+                title="Resume link"
+                aria-label={`Resume ${slug}`}
+                onClick={() => runUpdate({ status: "ACTIVE" })}
+              >
+                <Play className="h-4 w-4" />
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              disabled={pending}
+              title={editing ? "Cancel edit" : "Edit destination URL"}
+              aria-label={editing ? "Cancel edit" : `Edit destination for ${slug}`}
+              onClick={() => setEditing((v) => !v)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </>
         ) : null}
-        <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => setEditing((v) => !v)}>
-          {editing ? "Cancel" : "Edit URL"}
-        </Button>
       </div>
       {editing ? (
         <form

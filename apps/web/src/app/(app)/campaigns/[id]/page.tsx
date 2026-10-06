@@ -5,6 +5,9 @@ import { resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
 import { Button } from "@/shared/ui/button";
+import { IconLinkButton } from "@/shared/ui/icon-link-button";
+import { LinkStatusBadge } from "@/shared/ui/status-badge";
+import { BarChart3 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -53,9 +56,16 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             {campaign.status} · {campaign.links.length} links · {lifetimeClicks.toLocaleString()} lifetime clicks
           </p>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/campaigns">Back to campaigns</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <IconLinkButton
+            href={`/analytics?campaignId=${id}&range=30d`}
+            icon={BarChart3}
+            label="Campaign analytics"
+          />
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/campaigns">Back to campaigns</Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -85,9 +95,15 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                 <Link href={`/analytics?slug=${l.slug}&range=30d`} className="font-mono text-primary hover:underline">
                   {publicShortUrl(l.slug)}
                 </Link>
-                <span className="text-muted-foreground">
-                  {l.clickCount} clicks · {l.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">{l.clickCount.toLocaleString()} clicks</span>
+                  <LinkStatusBadge status={l.status} />
+                  <IconLinkButton
+                    href={`/analytics?slug=${encodeURIComponent(l.slug)}&range=30d`}
+                    icon={BarChart3}
+                    label={`Analytics for ${l.slug}`}
+                  />
+                </div>
               </li>
             ))}
           </ul>

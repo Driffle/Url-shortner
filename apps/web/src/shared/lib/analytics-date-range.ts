@@ -107,13 +107,17 @@ export function resolveAnalyticsRange(input: {
   return { ok: true, value: { preset, from, to, label } };
 }
 
-export function analyticsRangeQueryString(range: ResolvedAnalyticsRange, slug?: string): string {
+export function analyticsRangeQueryString(
+  range: ResolvedAnalyticsRange,
+  opts?: { slug?: string; campaignId?: string },
+): string {
   const p = new URLSearchParams();
   p.set("range", range.preset);
   if (range.preset === "custom") {
     p.set("from", range.from.toISOString().slice(0, 10));
     p.set("to", range.to.toISOString().slice(0, 10));
   }
-  if (slug) p.set("slug", slug);
+  if (opts?.slug) p.set("slug", opts.slug);
+  if (opts?.campaignId) p.set("campaignId", opts.campaignId);
   return p.toString();
 }
