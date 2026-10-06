@@ -10,18 +10,15 @@ function csvEscape(s: string) {
   return s;
 }
 
+const BATCH = 500;
+
 export async function GET() {
   const session = await getAppSession();
   if (!session?.user?.role || !can(session.user.role, Permissions.readAnalytics)) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const links = await prisma.link.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 5000,
-    include: { campaign: { select: { name: true } } },
-  });
-
+  const encoder = new TextEncoder();
   const header = [
     "slug",
     "short_url_go",
@@ -32,27 +29,47 @@ export async function GET() {
     "status",
     "created_at",
   ].join(",");
-  const rows = links.map((l) =>
-    [
-      l.slug,
-      publicShortUrl(l.slug),
-      publicInstantShortUrl(l.slug),
-      l.destinationUrl,
-      l.campaign?.name ?? "",
-      String(l.clickCount),
-      l.status,
-      l.createdAt.toISOString(),
-    ]
-      .map(csvEscape)
-      .join(","),
-  );
 
-  const body = [header, ...rows].join("\n");
-  return new Response(body, {
+  const stream = new ReadableStream({
+    async start(controller) {
+      controller.enqueue(encoder.encode(`${header}\n`));
+      let cursor: string | undefined;
+      for (;;) {
+        const batch = await prisma.link.findMany({
+          take: BATCH,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+          orderBy: { id: "asc" },
+          include: { campaign: { select: { name: true } } },
+        });
+        if (batch.length === 0) break;
+        for (const l of batch) {
+          const row = [
+            l.slug,
+            publicShortUrl(l.slug),
+            publicInstantShortUrl(l.slug),
+            l.destinationUrl,
+            l.campaign?.name ?? "",
+            String(l.clickCount),
+            l.status,
+            l.createdAt.toISOString(),
+          ]
+            .map(csvEscape)
+            .join(",");
+          controller.enqueue(encoder.encode(`${row}\n`));
+        }
+        cursor = batch[batch.length - 1]?.id;
+        if (batch.length < BATCH) break;
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": 'attachment; filename="driffle-links.csv"',
+      "Transfer-Encoding": "chunked",
     },
   });
 }

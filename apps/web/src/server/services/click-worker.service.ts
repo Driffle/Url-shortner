@@ -1,5 +1,6 @@
 import { getRedis, RedisKeys } from "@/server/redis/client";
 import { clickIngestService } from "@/server/services/click-ingest.service";
+import { recordClickIngestBatchFailure } from "@/server/observability/metrics";
 import { clickEventEnvelopeSchema } from "@/shared/validations/click-event";
 
 export const CLICK_STREAM_GROUP = "click-workers";
@@ -149,6 +150,7 @@ export async function runClickWorkerLoop(signal?: AbortSignal): Promise<void> {
     try {
       await runClickWorkerCycle();
     } catch (err) {
+      recordClickIngestBatchFailure();
       console.error(JSON.stringify({ event: "click_worker_error", message: String(err) }));
       await new Promise((r) => setTimeout(r, 2000));
     }

@@ -306,9 +306,17 @@ See repository `.env.example` for required variables (`NEXTAUTH_*`, `GOOGLE_*`, 
 
 ## 19. Scalability notes
 
-- **Click table growth:** partition by month on `ClickEvent` when row count exceeds comfortable single-table maintenance (~100M+ depending on instance).
-- **Rollup cardinality:** keep `scopeType` narrow; avoid high-cardinality dimensions in rollup rows — store top-N JSON snapshots (already stubbed in schema).
-- **Redis memory:** set `maxmemory-policy` in production Redis config (not in compose by default — add when sizing is known).
+- **Click table growth:** retention cron (`POST /api/cron/retention`) purges raw events after `CLICK_EVENT_RETENTION_DAYS` (default 180). Monthly **native partitions** when row count exceeds comfortable single-table maintenance (~100M+).
+- **Rollup cardinality:** keep `scopeType` narrow; avoid high-cardinality dimensions in rollup rows — store top-N JSON snapshots.
+- **Redis memory:** compose sets `maxmemory` + `volatile-lru`; click stream capped with `MAXLEN ~`.
+- **Pooling:** optional PgBouncer profile; see [PHASE2-OPERATIONS.md](./PHASE2-OPERATIONS.md).
+
+### On-call (Phase 2)
+
+1. Check [Shortly readiness](https://shortly.driffle.net/api/health/ready) and Cloudflare tunnel.
+2. `GET /api/metrics` with cron secret — queue depth, cache hit ratio.
+3. `docker logs` on `click-worker` for ingest failures.
+4. Runbook: [PHASE2-OPERATIONS.md](./PHASE2-OPERATIONS.md), DR: [DISASTER-RECOVERY.md](./DISASTER-RECOVERY.md).
 
 ---
 
