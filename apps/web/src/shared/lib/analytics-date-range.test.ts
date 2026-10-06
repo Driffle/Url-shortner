@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
+import { defaultCustomRangeIsoDates, resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
 
 describe("resolveAnalyticsRange", () => {
   it("resolves 7d preset", () => {
@@ -19,5 +19,12 @@ describe("resolveAnalyticsRange", () => {
   it("accepts custom range", () => {
     const r = resolveAnalyticsRange({ range: "custom", from: "2026-10-01", to: "2026-10-06" });
     assert.equal(r.ok, true);
+  });
+
+  it("defaultCustomRangeIsoDates returns 30-day inclusive window", () => {
+    const { from, to } = defaultCustomRangeIsoDates();
+    assert.match(from, /^\d{4}-\d{2}-\d{2}$/);
+    assert.match(to, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(from <= to);
   });
 });

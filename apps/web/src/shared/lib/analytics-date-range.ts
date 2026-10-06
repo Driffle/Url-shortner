@@ -27,6 +27,17 @@ function utcDayEnd(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
 }
 
+/** Default custom picker window: last 30 UTC days through today. */
+export function defaultCustomRangeIsoDates(): { from: string; to: string } {
+  const now = new Date();
+  const todayStart = utcDayStart(now);
+  const fromStart = utcDayStart(new Date(todayStart.getTime() - 29 * 86400000));
+  return {
+    from: fromStart.toISOString().slice(0, 10),
+    to: todayStart.toISOString().slice(0, 10),
+  };
+}
+
 function parseIsoDate(s: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
   const d = new Date(`${s}T00:00:00.000Z`);

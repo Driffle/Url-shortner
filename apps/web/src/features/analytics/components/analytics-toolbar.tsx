@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
-import type { AnalyticsRangePreset } from "@/shared/lib/analytics-date-range";
+import { defaultCustomRangeIsoDates, type AnalyticsRangePreset } from "@/shared/lib/analytics-date-range";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -32,8 +32,9 @@ export function AnalyticsToolbar({ range, from, to, slug, campaignId, initialSlu
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [suggestions, setSuggestions] = useState<LinkOption[]>([]);
-  const [customFrom, setCustomFrom] = useState(from ?? "");
-  const [customTo, setCustomTo] = useState(to ?? "");
+  const defaults = defaultCustomRangeIsoDates();
+  const [customFrom, setCustomFrom] = useState(from ?? defaults.from);
+  const [customTo, setCustomTo] = useState(to ?? defaults.to);
 
   const navigate = useCallback(
     (params: URLSearchParams) => {
@@ -57,7 +58,12 @@ export function AnalyticsToolbar({ range, from, to, slug, campaignId, initialSlu
     if (preset !== "custom") {
       p.delete("from");
       p.delete("to");
+      navigate(p);
+      return;
     }
+    const { from: df, to: dt } = defaultCustomRangeIsoDates();
+    p.set("from", from ?? df);
+    p.set("to", to ?? dt);
     navigate(p);
   };
 
