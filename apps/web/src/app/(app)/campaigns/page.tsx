@@ -3,6 +3,8 @@ import { prisma } from "@/server/db/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { CreateCampaignForm } from "@/features/campaigns/components/create-campaign-form";
 import { Button } from "@/shared/ui/button";
+import { IconLinkButton } from "@/shared/ui/icon-link-button";
+import { BarChart3, Eye } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -67,9 +69,14 @@ export default async function CampaignsPage({
                           {c.status} · {c._count.links} links · {clicks.toLocaleString()} clicks
                         </p>
                       </div>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/campaigns/${c.id}`}>View</Link>
-                      </Button>
+                      <div className="flex items-center gap-0.5">
+                        <IconLinkButton href={`/campaigns/${c.id}`} icon={Eye} label={`View ${c.name}`} />
+                        <IconLinkButton
+                          href={`/analytics?campaignId=${c.id}&range=30d`}
+                          icon={BarChart3}
+                          label={`Analytics for ${c.name}`}
+                        />
+                      </div>
                     </li>
                   );
                 })}

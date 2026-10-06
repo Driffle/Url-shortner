@@ -24,13 +24,13 @@ type Props = {
   from?: string;
   to?: string;
   slug?: string;
+  campaignId?: string;
   initialSlugLabel?: string;
 };
 
-export function AnalyticsToolbar({ range, from, to, slug, initialSlugLabel }: Props) {
+export function AnalyticsToolbar({ range, from, to, slug, campaignId, initialSlugLabel }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [q, setQ] = useState(slug ?? "");
   const [suggestions, setSuggestions] = useState<LinkOption[]>([]);
   const [customFrom, setCustomFrom] = useState(from ?? "");
   const [customTo, setCustomTo] = useState(to ?? "");
@@ -47,8 +47,9 @@ export function AnalyticsToolbar({ range, from, to, slug, initialSlugLabel }: Pr
   const buildBase = useCallback(() => {
     const p = new URLSearchParams();
     if (slug) p.set("slug", slug);
+    if (campaignId) p.set("campaignId", campaignId);
     return p;
-  }, [slug]);
+  }, [slug, campaignId]);
 
   const onPreset = (preset: AnalyticsRangePreset) => {
     const p = buildBase();
@@ -61,7 +62,6 @@ export function AnalyticsToolbar({ range, from, to, slug, initialSlugLabel }: Pr
   };
 
   const onSlugSearch = async (value: string) => {
-    setQ(value);
     if (value.length < 1) {
       setSuggestions([]);
       return;
@@ -73,14 +73,14 @@ export function AnalyticsToolbar({ range, from, to, slug, initialSlugLabel }: Pr
   };
 
   const applySlug = (s: string) => {
-    const p = buildBase();
+    const p = new URLSearchParams();
     p.set("range", range);
     if (range === "custom" && from && to) {
       p.set("from", from);
       p.set("to", to);
     }
     if (s) p.set("slug", s);
-    else p.delete("slug");
+    if (campaignId) p.delete("campaignId");
     setSuggestions([]);
     navigate(p);
   };
@@ -93,21 +93,53 @@ export function AnalyticsToolbar({ range, from, to, slug, initialSlugLabel }: Pr
     navigate(p);
   };
 
+  const clearFiltersHref = `/analytics?range=${range}${range === "custom" && from && to ? `&from=${from}&to=${to}` : ""}`;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {PRESETS.map((p) => (
-          <Button
-            key={p.id}
-            type="button"
-            size="sm"
-            variant={range === p.id ? "default" : "outline"}
-            disabled={pending}
-            onClick={() => onPreset(p.id)}
-          >
-            {p.label}
-          </Button>
-        ))}
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative min-w-0 flex-1 space-y-1 lg:max-w-md">
+          <Label htmlFor="slug-search" className="sr-only">
+            Filter by short link
+          </Label>
+          <Input
+            id="slug-search"
+            placeholder="Search slug or destination…"
+            defaultValue={initialSlugLabel ?? slug ?? ""}
+            onChange={(e) => void onSlugSearch(e.target.value)}
+          />
+          {suggestions.length > 0 ? (
+            <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover p-1 text-sm shadow-md">
+              {suggestions.map((l) => (
+                <li key={l.slug}>
+                  <button
+                    type="button"
+                    className="w-full rounded px-2 py-1.5 text-left hover:bg-accent"
+                    onClick={() => applySlug(l.slug)}
+                  >
+                    <span className="font-mono">{l.slug}</span>
+                    <span className="ml-2 truncate text-muted-foreground">{l.destinationUrl.slice(0, 40)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2">
+          {PRESETS.map((p) => (
+            <Button
+              key={p.id}
+              type="button"
+              size="sm"
+              variant={range === p.id ? "default" : "outline"}
+              disabled={pending}
+              onClick={() => onPreset(p.id)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {range === "custom" ? (
@@ -126,38 +158,11 @@ export function AnalyticsToolbar({ range, from, to, slug, initialSlugLabel }: Pr
         </div>
       ) : null}
 
-      <div className="relative max-w-md space-y-1">
-        <Label htmlFor="slug-search">Filter by short link</Label>
-        <Input
-          id="slug-search"
-          placeholder="Search slug or destination…"
-          defaultValue={initialSlugLabel ?? slug ?? ""}
-          onChange={(e) => void onSlugSearch(e.target.value)}
-        />
-        {suggestions.length > 0 ? (
-          <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover p-1 text-sm shadow-md">
-            {suggestions.map((l) => (
-              <li key={l.slug}>
-                <button
-                  type="button"
-                  className="w-full rounded px-2 py-1.5 text-left hover:bg-accent"
-                  onClick={() => applySlug(l.slug)}
-                >
-                  <span className="font-mono">{l.slug}</span>
-                  <span className="ml-2 truncate text-muted-foreground">{l.destinationUrl.slice(0, 40)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {slug ? (
-          <Button type="button" variant="ghost" size="sm" className="mt-1" asChild>
-            <Link href={`/analytics?range=${range}${range === "custom" && from && to ? `&from=${from}&to=${to}` : ""}`}>
-              Clear link filter
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      {slug || campaignId ? (
+        <Button type="button" variant="ghost" size="sm" className="w-fit" asChild>
+          <Link href={clearFiltersHref}>Clear filters</Link>
+        </Button>
+      ) : null}
     </div>
   );
 }

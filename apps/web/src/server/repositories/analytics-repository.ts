@@ -3,7 +3,7 @@ import { getAnalyticsCacheVersion, getRedis, RedisKeys } from "@/server/redis/cl
 import { RollupGranularity } from "@prisma/client";
 import { getEnv } from "@/shared/validations/env";
 
-export type AnalyticsScope = { linkId?: string };
+export type AnalyticsScope = { linkId?: string; campaignId?: string };
 
 export type RangeMetrics = {
   totalClicks: number;
@@ -19,17 +19,12 @@ export class AnalyticsRepository {
     to: Date,
     scope?: AnalyticsScope,
   ): Promise<{ day: string; clicks: number }[]> {
-    const cacheKey = await this.cacheKey("clicksByDay", from, to, scope?.linkId);
+    const cacheKey = await this.cacheKey("clicksByDay", from, to, this.scopeCacheId(scope));
     const cached = await this.getCached<{ day: string; clicks: number }[]>(cacheKey);
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: {
-        granularity: RollupGranularity.DAY,
-        scopeType: "LINK",
-        bucketStart: { gte: from, lte: to },
-        ...(scope?.linkId ? { scopeId: scope.linkId } : {}),
-      },
+      where: this.rollupDayWhere(from, to, scope),
       orderBy: { bucketStart: "asc" },
       select: { bucketStart: true, totalClicks: true },
     });
@@ -54,17 +49,12 @@ export class AnalyticsRepository {
   }
 
   async rangeMetrics(from: Date, to: Date, scope?: AnalyticsScope): Promise<RangeMetrics> {
-    const cacheKey = await this.cacheKey("rangeMetrics", from, to, scope?.linkId);
+    const cacheKey = await this.cacheKey("rangeMetrics", from, to, this.scopeCacheId(scope));
     const cached = await this.getCached<RangeMetrics>(cacheKey);
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: {
-        granularity: RollupGranularity.DAY,
-        scopeType: "LINK",
-        bucketStart: { gte: from, lte: to },
-        ...(scope?.linkId ? { scopeId: scope.linkId } : {}),
-      },
+      where: this.rollupDayWhere(from, to, scope),
       select: { totalClicks: true, uniqueClicks: true },
     });
 
@@ -91,17 +81,12 @@ export class AnalyticsRepository {
       return this.topReferrersFromEvents(from, to, scope, limit);
     }
 
-    const cacheKey = await this.cacheKey("topReferrers", from, to, scope?.linkId);
+    const cacheKey = await this.cacheKey("topReferrers", from, to, this.scopeCacheId(scope));
     const cached = await this.getCached<ReferrerRow[]>(cacheKey);
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: {
-        granularity: RollupGranularity.DAY,
-        scopeType: "LINK",
-        bucketStart: { gte: from, lte: to },
-        ...(scope?.linkId ? { scopeId: scope.linkId } : {}),
-      },
+      where: this.rollupDayWhere(from, to, scope),
       select: { topReferrers: true },
     });
 
@@ -135,17 +120,12 @@ export class AnalyticsRepository {
       return this.deviceMixFromEvents(from, to, scope, limit);
     }
 
-    const cacheKey = await this.cacheKey("deviceMix", from, to, scope?.linkId);
+    const cacheKey = await this.cacheKey("deviceMix", from, to, this.scopeCacheId(scope));
     const cached = await this.getCached<DeviceRow[]>(cacheKey);
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: {
-        granularity: RollupGranularity.DAY,
-        scopeType: "LINK",
-        bucketStart: { gte: from, lte: to },
-        ...(scope?.linkId ? { scopeId: scope.linkId } : {}),
-      },
+      where: this.rollupDayWhere(from, to, scope),
       select: { deviceMix: true },
     });
 
@@ -193,11 +173,11 @@ export class AnalyticsRepository {
   }
 
   async recentClicks(limit = 20, scope?: AnalyticsScope) {
-    const cacheKey = await this.cacheKey("recentClicks", new Date(0), new Date(), scope?.linkId ?? "all");
+    const cacheKey = await this.cacheKey("recentClicks", new Date(0), new Date(), this.scopeCacheId(scope));
     const cached = await this.getCached<
       Awaited<ReturnType<typeof this.fetchRecentClicks>>
     >(cacheKey);
-    if (cached) return cached;
+    if (cached) return this.reviveRecentClicks(cached);
 
     const result = await this.fetchRecentClicks(limit, scope);
     await this.setCached(cacheKey, result);
@@ -218,6 +198,51 @@ export class AnalyticsRepository {
     });
   }
 
+  private scopeCacheId(scope?: AnalyticsScope): string {
+    if (scope?.linkId) return `link:${scope.linkId}`;
+    if (scope?.campaignId) return `campaign:${scope.campaignId}`;
+    return "all";
+  }
+
+  private rollupDayWhere(from: Date, to: Date, scope?: AnalyticsScope) {
+    if (scope?.campaignId) {
+      return {
+        granularity: RollupGranularity.DAY,
+        scopeType: "CAMPAIGN",
+        scopeId: scope.campaignId,
+        bucketStart: { gte: from, lte: to },
+      };
+    }
+    return {
+      granularity: RollupGranularity.DAY,
+      scopeType: "LINK",
+      bucketStart: { gte: from, lte: to },
+      ...(scope?.linkId ? { scopeId: scope.linkId } : {}),
+    };
+  }
+
+  private reviveRecentClicks(
+    rows: Awaited<ReturnType<AnalyticsRepository["fetchRecentClicks"]>>,
+  ): Awaited<ReturnType<AnalyticsRepository["fetchRecentClicks"]>> {
+    return rows.map((r) => ({
+      ...r,
+      createdAt: r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt as string),
+    }));
+  }
+
+  private async linkEventWhere(scope?: AnalyticsScope): Promise<{ linkId?: string | { in: string[] } }> {
+    if (scope?.linkId) return { linkId: scope.linkId };
+    if (scope?.campaignId) {
+      const links = await prisma.link.findMany({
+        where: { campaignId: scope.campaignId },
+        select: { id: true },
+      });
+      const ids = links.map((l) => l.id);
+      return { linkId: { in: ids.length > 0 ? ids : ["__no_links__"] } };
+    }
+    return {};
+  }
+
   private isIntradayTodayOnly(from: Date, to: Date): boolean {
     const day = from.toISOString().slice(0, 10);
     return day === to.toISOString().slice(0, 10) && day === new Date().toISOString().slice(0, 10);
@@ -229,6 +254,7 @@ export class AnalyticsRepository {
     scope: AnalyticsScope | undefined,
     limit: number,
   ): Promise<ReferrerRow[]> {
+    const linkWhere = await this.linkEventWhere(scope);
     const agg = await prisma.clickEvent.groupBy({
       by: ["referrerId"],
       _count: { _all: true },
@@ -236,7 +262,7 @@ export class AnalyticsRepository {
         createdAt: { gte: from, lte: to },
         isBot: false,
         referrerId: { not: null },
-        ...(scope?.linkId ? { linkId: scope.linkId } : {}),
+        ...linkWhere,
       },
     });
     const ids = agg.map((a) => a.referrerId).filter(Boolean) as string[];
@@ -259,13 +285,14 @@ export class AnalyticsRepository {
     scope: AnalyticsScope | undefined,
     limit: number,
   ): Promise<DeviceRow[]> {
+    const linkWhere = await this.linkEventWhere(scope);
     const agg = await prisma.clickEvent.groupBy({
       by: ["deviceId"],
       _count: { _all: true },
       where: {
         createdAt: { gte: from, lte: to },
         isBot: false,
-        ...(scope?.linkId ? { linkId: scope.linkId } : {}),
+        ...linkWhere,
       },
     });
     const ids = agg.map((a) => a.deviceId).filter(Boolean) as string[];

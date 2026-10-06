@@ -15,7 +15,7 @@ const items = [
 export function MobileNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex shrink-0 gap-2 overflow-x-auto border-b border-border bg-[#191818] px-3 py-2 md:hidden">
+    <nav className="flex shrink-0 gap-2 overflow-x-auto border-b border-blue-100 bg-white px-3 py-2 md:hidden">
       {items.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
@@ -25,8 +25,8 @@ export function MobileNav() {
             className={cn(
               "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium",
               active
-                ? "bg-white text-[#191818]"
-                : "border border-white/20 text-white/80 hover:text-white",
+                ? "bg-blue-600 text-white"
+                : "border border-blue-100 text-slate-600 hover:border-blue-200 hover:text-blue-700",
             )}
           >
             {item.label}
