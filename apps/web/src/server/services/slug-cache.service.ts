@@ -41,11 +41,9 @@ export class SlugCacheService {
   async refresh(slug: string, payload: CachedSlugPayload): Promise<void> {
     const redis = getRedis();
     const normalized = slug.toLowerCase();
-    await redis
-      .multi()
-      .set(RedisKeys.slugCache(normalized), JSON.stringify(payload), "EX", TTL_SEC)
-      .del(RedisKeys.slugCacheMiss(normalized))
-      .exec();
+    // Managed Redis ACLs often disallow MULTI/EXEC — use separate commands.
+    await redis.set(RedisKeys.slugCache(normalized), JSON.stringify(payload), "EX", TTL_SEC);
+    await redis.del(RedisKeys.slugCacheMiss(normalized));
   }
 
   async invalidate(slug: string): Promise<void> {

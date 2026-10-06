@@ -187,9 +187,8 @@ export class ClickIngestService {
     if (events.length === 0) return;
     try {
       const redis = getRedis();
-      const pipe = redis.pipeline();
       for (const e of events) {
-        pipe.lpush(
+        await redis.lpush(
           RedisKeys.clickFeed(),
           JSON.stringify({
             linkId: e.linkId,
@@ -200,8 +199,7 @@ export class ClickIngestService {
           }),
         );
       }
-      pipe.ltrim(RedisKeys.clickFeed(), 0, 199);
-      await pipe.exec();
+      await redis.ltrim(RedisKeys.clickFeed(), 0, 199);
     } catch {
       // Redis failures must not break ingestion
     }
