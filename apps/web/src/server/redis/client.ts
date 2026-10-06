@@ -34,4 +34,5 @@ export const RedisKeys = {
   rateLimitVisitPost: (ip: string, window: string) => redisKey(`rl:visitpost:${ip}:${window}`),
   clickFeed: () => redisKey("feed:clicks"),
   clickQueue: () => redisKey("queue:clicks"),
+  clickStream: () => redisKey("stream:clicks"),
 } as const;
