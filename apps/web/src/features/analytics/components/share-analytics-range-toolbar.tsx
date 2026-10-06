@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import type { AnalyticsRangePreset } from "@/shared/lib/analytics-date-range";
+import { defaultCustomRangeIsoDates, type AnalyticsRangePreset } from "@/shared/lib/analytics-date-range";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
@@ -26,8 +26,9 @@ type Props = {
 export function ShareAnalyticsRangeToolbar({ slug, range, from, to }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [customFrom, setCustomFrom] = useState(from ?? "");
-  const [customTo, setCustomTo] = useState(to ?? "");
+  const defaults = defaultCustomRangeIsoDates();
+  const [customFrom, setCustomFrom] = useState(from ?? defaults.from);
+  const [customTo, setCustomTo] = useState(to ?? defaults.to);
 
   const basePath = `/share/analytics/${encodeURIComponent(slug)}`;
 
@@ -44,8 +45,9 @@ export function ShareAnalyticsRangeToolbar({ slug, range, from, to }: Props) {
       navigate(p);
       return;
     }
-    if (from) p.set("from", from);
-    if (to) p.set("to", to);
+    const { from: df, to: dt } = defaultCustomRangeIsoDates();
+    p.set("from", from ?? df);
+    p.set("to", to ?? dt);
     navigate(p);
   };
 
