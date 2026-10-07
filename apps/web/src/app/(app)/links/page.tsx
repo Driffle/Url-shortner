@@ -12,6 +12,8 @@ import { publicShortUrl } from "@/shared/lib/short-link-url";
 import { can, Permissions } from "@/shared/lib/rbac";
 import { LinkRowActions } from "@/features/links/components/link-row-actions";
 import { LinkStatusBadge } from "@/shared/ui/status-badge";
+import { analyticsRepository } from "@/server/repositories/analytics-repository";
+import { defaultReportingRange } from "@/shared/lib/analytics-date-range";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +82,8 @@ export default async function LinksPage({
 
   const cacheKey = createHash("sha256").update(JSON.stringify(where)).digest("hex").slice(0, 16);
 
+  const reporting = defaultReportingRange();
+
   const [links, total] = await Promise.all([
     prisma.link.findMany({
       where,
@@ -90,6 +94,12 @@ export default async function LinksPage({
     }),
     countLinksCached(where, cacheKey),
   ]);
+
+  const clicksInRange = await analyticsRepository.linkClickTotalsInRange(
+    reporting.from,
+    reporting.to,
+    links.map((l) => l.id),
+  );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -165,7 +175,7 @@ export default async function LinksPage({
                       <th className="py-2 pr-4 font-medium">Short URL</th>
                       <th className="py-2 pr-4 font-medium">Destination</th>
                       <th className="py-2 pr-4 font-medium">Campaign</th>
-                      <th className="py-2 pr-4 font-medium">Clicks</th>
+                      <th className="py-2 pr-4 font-medium">Clicks (30d)</th>
                       <th className="py-2 pr-4 font-medium">Status</th>
                       <th className="py-2 font-medium">Actions</th>
                     </tr>
@@ -176,7 +186,7 @@ export default async function LinksPage({
                         <td className="py-3 pr-4 font-mono text-xs">{publicShortUrl(l.slug, requestHost)}</td>
                         <td className="max-w-xs truncate py-3 pr-4">{l.destinationUrl}</td>
                         <td className="py-3 pr-4">{l.campaign?.name ?? "—"}</td>
-                        <td className="py-3 pr-4">{l.clickCount.toLocaleString()}</td>
+                        <td className="py-3 pr-4">{(clicksInRange.get(l.id) ?? 0).toLocaleString()}</td>
                         <td className="py-3 pr-4">
                           <LinkStatusBadge status={l.status} />
                         </td>

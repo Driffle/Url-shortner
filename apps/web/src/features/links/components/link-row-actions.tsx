@@ -41,7 +41,7 @@ export function LinkRowActions({ linkId, slug, status, destinationUrl, canEdit }
     <div className="flex min-w-[6rem] flex-col items-end gap-2">
       <div className="flex items-center justify-end gap-0.5">
         <IconLinkButton
-          href={`/analytics?slug=${encodeURIComponent(slug)}&range=all`}
+          href={`/analytics?slug=${encodeURIComponent(slug)}&range=30d`}
           icon={BarChart3}
           label={`Analytics for ${slug}`}
         />

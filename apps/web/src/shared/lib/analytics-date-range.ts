@@ -16,6 +16,17 @@ export const ANALYTICS_ALL_TIME_START = new Date(Date.UTC(2020, 0, 1, 0, 0, 0, 0
 
 export type AnalyticsRangePreset = z.infer<typeof analyticsRangePresetSchema>;
 
+/** Default reporting window for lists, dashboard, and analytics. */
+export const DEFAULT_ANALYTICS_PRESET: AnalyticsRangePreset = "30d";
+
+export function defaultReportingRange(): ResolvedAnalyticsRange {
+  const resolved = resolveAnalyticsRange({ defaultPreset: DEFAULT_ANALYTICS_PRESET });
+  if (!resolved.ok) {
+    throw new Error("Failed to resolve default reporting range");
+  }
+  return resolved.value;
+}
+
 export type ResolvedAnalyticsRange = {
   preset: AnalyticsRangePreset;
   from: Date;

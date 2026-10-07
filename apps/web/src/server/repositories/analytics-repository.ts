@@ -170,27 +170,128 @@ export class AnalyticsRepository {
     return result;
   }
 
-  async topCampaigns(limit = 5) {
-    const cacheKey = await this.cacheKey("topCampaigns", new Date(0), new Date(), `lim${limit}`);
+  /** Sum of link day-rollups per link id in `[from, to]`. */
+  async linkClickTotalsInRange(from: Date, to: Date, linkIds: string[]): Promise<Map<string, number>> {
+    if (linkIds.length === 0) return new Map();
+
+    const rows = await prisma.analyticsRollup.groupBy({
+      by: ["scopeId"],
+      where: {
+        granularity: RollupGranularity.DAY,
+        scopeType: "LINK",
+        scopeId: { in: linkIds },
+        bucketStart: { gte: from, lte: to },
+      },
+      _sum: { totalClicks: true },
+    });
+
+    const totals = new Map<string, number>();
+    for (const id of linkIds) totals.set(id, 0);
+    for (const row of rows) {
+      if (!row.scopeId) continue;
+      totals.set(row.scopeId, row._sum.totalClicks ?? 0);
+    }
+    return totals;
+  }
+
+  async campaignClickTotalsInRange(
+    from: Date,
+    to: Date,
+    campaignIds: string[],
+  ): Promise<Map<string, number>> {
+    if (campaignIds.length === 0) return new Map();
+
+    const links = await prisma.link.findMany({
+      where: { campaignId: { in: campaignIds } },
+      select: { id: true, campaignId: true },
+    });
+    const byLink = await this.linkClickTotalsInRange(
+      from,
+      to,
+      links.map((l) => l.id),
+    );
+
+    const byCampaign = new Map<string, number>();
+    for (const id of campaignIds) byCampaign.set(id, 0);
+    for (const link of links) {
+      if (!link.campaignId) continue;
+      byCampaign.set(
+        link.campaignId,
+        (byCampaign.get(link.campaignId) ?? 0) + (byLink.get(link.id) ?? 0),
+      );
+    }
+    return byCampaign;
+  }
+
+  async topCampaignsInRange(from: Date, to: Date, limit = 5) {
+    const cacheKey = await this.cacheKey("topCampaignsInRange", from, to, `lim${limit}`);
     const cached = await this.getCached<
       { id: string; name: string; linkCount: number; clicks: number }[]
     >(cacheKey);
     if (cached) return cached;
 
-    const campaigns = await prisma.campaign.findMany({
-      take: 40,
-      where: { archivedAt: null },
-      include: { links: { select: { clickCount: true } } },
+    const grouped = await prisma.analyticsRollup.groupBy({
+      by: ["scopeId"],
+      where: {
+        granularity: RollupGranularity.DAY,
+        scopeType: "LINK",
+        bucketStart: { gte: from, lte: to },
+      },
+      _sum: { totalClicks: true },
     });
-    const result = campaigns
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        linkCount: c.links.length,
-        clicks: c.links.reduce((a, l) => a + l.clickCount, 0),
-      }))
-      .sort((a, b) => b.clicks - a.clicks)
-      .slice(0, limit);
+
+    const clicksByLinkId = new Map(
+      grouped
+        .filter((g) => g.scopeId)
+        .map((g) => [g.scopeId!, g._sum.totalClicks ?? 0] as const),
+    );
+    const linkIds = [...clicksByLinkId.keys()];
+    if (linkIds.length === 0) {
+      await this.setCached(cacheKey, []);
+      return [];
+    }
+
+    const links = await prisma.link.findMany({
+      where: { id: { in: linkIds }, campaignId: { not: null } },
+      select: { id: true, campaignId: true },
+    });
+
+    const clicksByCampaign = new Map<string, number>();
+    for (const link of links) {
+      if (!link.campaignId) continue;
+      const n = clicksByLinkId.get(link.id) ?? 0;
+      clicksByCampaign.set(link.campaignId, (clicksByCampaign.get(link.campaignId) ?? 0) + n);
+    }
+
+    const rankedIds = [...clicksByCampaign.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([id]) => id);
+
+    if (rankedIds.length === 0) {
+      await this.setCached(cacheKey, []);
+      return [];
+    }
+
+    const campaigns = await prisma.campaign.findMany({
+      where: { id: { in: rankedIds }, archivedAt: null },
+      select: { id: true, name: true, _count: { select: { links: true } } },
+    });
+    const nameById = new Map(campaigns.map((c) => [c.id, c]));
+
+    const result = rankedIds
+      .map((id) => {
+        const c = nameById.get(id);
+        if (!c) return null;
+        return {
+          id: c.id,
+          name: c.name,
+          linkCount: c._count.links,
+          clicks: clicksByCampaign.get(id) ?? 0,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+
     await this.setCached(cacheKey, result);
     return result;
   }
