@@ -7,8 +7,12 @@ export const analyticsRangePresetSchema = z.enum([
   "14d",
   "30d",
   "90d",
+  "all",
   "custom",
 ]);
+
+/** Earliest UTC day included in the `all` preset (inclusive). */
+export const ANALYTICS_ALL_TIME_START = new Date(Date.UTC(2020, 0, 1, 0, 0, 0, 0));
 
 export type AnalyticsRangePreset = z.infer<typeof analyticsRangePresetSchema>;
 
@@ -110,6 +114,10 @@ export function resolveAnalyticsRange(input: {
     case "90d":
       from = utcDayStart(new Date(todayStart.getTime() - 89 * 86400000));
       label = "Last 90 days";
+      break;
+    case "all":
+      from = ANALYTICS_ALL_TIME_START;
+      label = "All time";
       break;
     default:
       break;

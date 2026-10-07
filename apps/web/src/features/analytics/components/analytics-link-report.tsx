@@ -49,7 +49,7 @@ export function AnalyticsLinkReport({
             <p className="text-2xl font-semibold">{metrics.totalClicks.toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">Unique clicks (rollup)</p>
+            <p className="text-muted-foreground">{link ? "Unique visits" : "Unique clicks (rollup)"}</p>
             <p className="text-2xl font-semibold">{metrics.uniqueClicks.toLocaleString()}</p>
           </div>
         </CardContent>

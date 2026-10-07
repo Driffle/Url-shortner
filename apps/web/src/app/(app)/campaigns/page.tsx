@@ -72,7 +72,7 @@ export default async function CampaignsPage({
                       <div className="flex items-center gap-0.5">
                         <IconLinkButton href={`/campaigns/${c.id}`} icon={Eye} label={`View ${c.name}`} />
                         <IconLinkButton
-                          href={`/analytics?campaignId=${c.id}&range=30d`}
+                          href={`/analytics?campaignId=${c.id}&range=all`}
                           icon={BarChart3}
                           label={`Analytics for ${c.name}`}
                         />

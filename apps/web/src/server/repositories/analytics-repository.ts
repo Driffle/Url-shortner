@@ -24,7 +24,7 @@ export class AnalyticsRepository {
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: this.rollupDayWhere(from, to, scope),
+      where: await this.rollupDayWhere(from, to, scope),
       orderBy: { bucketStart: "asc" },
       select: { bucketStart: true, totalClicks: true },
     });
@@ -48,13 +48,36 @@ export class AnalyticsRepository {
     return this.clicksByDayInRange(since, to, scope);
   }
 
+  /** Lifetime totals from `Link` rows — matches list/dashboard click columns. */
+  async scopedLifetimeMetrics(scope: AnalyticsScope): Promise<RangeMetrics | null> {
+    if (scope.linkId) {
+      const link = await prisma.link.findUnique({
+        where: { id: scope.linkId },
+        select: { clickCount: true, visitCount: true },
+      });
+      if (!link) return null;
+      return { totalClicks: link.clickCount, uniqueClicks: link.visitCount };
+    }
+    if (scope.campaignId) {
+      const agg = await prisma.link.aggregate({
+        where: { campaignId: scope.campaignId },
+        _sum: { clickCount: true, visitCount: true },
+      });
+      return {
+        totalClicks: agg._sum.clickCount ?? 0,
+        uniqueClicks: agg._sum.visitCount ?? 0,
+      };
+    }
+    return null;
+  }
+
   async rangeMetrics(from: Date, to: Date, scope?: AnalyticsScope): Promise<RangeMetrics> {
     const cacheKey = await this.cacheKey("rangeMetrics", from, to, this.scopeCacheId(scope));
     const cached = await this.getCached<RangeMetrics>(cacheKey);
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: this.rollupDayWhere(from, to, scope),
+      where: await this.rollupDayWhere(from, to, scope),
       select: { totalClicks: true, uniqueClicks: true },
     });
 
@@ -86,7 +109,7 @@ export class AnalyticsRepository {
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: this.rollupDayWhere(from, to, scope),
+      where: await this.rollupDayWhere(from, to, scope),
       select: { topReferrers: true },
     });
 
@@ -125,7 +148,7 @@ export class AnalyticsRepository {
     if (cached) return cached;
 
     const rows = await prisma.analyticsRollup.findMany({
-      where: this.rollupDayWhere(from, to, scope),
+      where: await this.rollupDayWhere(from, to, scope),
       select: { deviceMix: true },
     });
 
@@ -204,12 +227,13 @@ export class AnalyticsRepository {
     return "all";
   }
 
-  private rollupDayWhere(from: Date, to: Date, scope?: AnalyticsScope) {
+  private async rollupDayWhere(from: Date, to: Date, scope?: AnalyticsScope) {
     if (scope?.campaignId) {
+      const linkIds = await this.campaignLinkIds(scope.campaignId);
       return {
         granularity: RollupGranularity.DAY,
-        scopeType: "CAMPAIGN",
-        scopeId: scope.campaignId,
+        scopeType: "LINK",
+        scopeId: { in: linkIds.length > 0 ? linkIds : ["__no_links__"] },
         bucketStart: { gte: from, lte: to },
       };
     }
@@ -219,6 +243,14 @@ export class AnalyticsRepository {
       bucketStart: { gte: from, lte: to },
       ...(scope?.linkId ? { scopeId: scope.linkId } : {}),
     };
+  }
+
+  private async campaignLinkIds(campaignId: string): Promise<string[]> {
+    const links = await prisma.link.findMany({
+      where: { campaignId },
+      select: { id: true },
+    });
+    return links.map((l) => l.id);
   }
 
   private reviveRecentClicks(

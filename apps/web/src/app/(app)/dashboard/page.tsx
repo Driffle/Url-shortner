@@ -5,7 +5,7 @@ import { analyticsRepository } from "@/server/repositories/analytics-repository"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { KpiStrip } from "@/features/dashboard/components/kpi-strip";
 import { ClickTrendChart } from "@/features/analytics/components/click-trend-chart";
-import { resolveAnalyticsRange, analyticsRangeQueryString } from "@/shared/lib/analytics-date-range";
+import { resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
 import { Button } from "@/shared/ui/button";
 import { IconLinkButton } from "@/shared/ui/icon-link-button";
 import { BarChart3 } from "lucide-react";
@@ -57,7 +57,7 @@ export default async function DashboardPage({
   ]);
 
   const totalClicks = clickSum._sum.clickCount ?? 0;
-  const analyticsHref = `/analytics?${analyticsRangeQueryString(range)}`;
+  const allTimeAnalyticsHref = `/analytics?range=all`;
 
   return (
     <div className="space-y-8">
@@ -73,7 +73,7 @@ export default async function DashboardPage({
             </Button>
           ))}
           <Button variant="secondary" size="sm" asChild>
-            <Link href={analyticsHref}>View in Analytics</Link>
+            <Link href={allTimeAnalyticsHref}>View in Analytics</Link>
           </Button>
         </div>
       </div>
@@ -114,7 +114,7 @@ export default async function DashboardPage({
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="text-muted-foreground">{c.clicks.toLocaleString()}</span>
                     <IconLinkButton
-                      href={`/analytics?${analyticsRangeQueryString(range, { campaignId: c.id })}`}
+                      href={`/analytics?campaignId=${c.id}&range=all`}
                       icon={BarChart3}
                       label={`Analytics for ${c.name}`}
                     />
@@ -138,7 +138,7 @@ export default async function DashboardPage({
             ) : (
               recent.map((e) => (
                 <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-                  <Link href={`/analytics?slug=${e.link.slug}&range=7d`} className="font-mono text-xs text-primary hover:underline">
+                  <Link href={`/analytics?slug=${e.link.slug}&range=all`} className="font-mono text-xs text-primary hover:underline">
                     {e.link.slug}
                   </Link>
                   <span className="text-muted-foreground">

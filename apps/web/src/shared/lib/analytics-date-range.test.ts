@@ -11,6 +11,14 @@ describe("resolveAnalyticsRange", () => {
     assert.equal(r.value.label, "Last 7 days");
   });
 
+  it("resolves all preset", () => {
+    const r = resolveAnalyticsRange({ range: "all" });
+    assert.equal(r.ok, true);
+    if (!r.ok) return;
+    assert.equal(r.value.preset, "all");
+    assert.equal(r.value.label, "All time");
+  });
+
   it("rejects invalid custom without dates", () => {
     const r = resolveAnalyticsRange({ range: "custom" });
     assert.equal(r.ok, false);

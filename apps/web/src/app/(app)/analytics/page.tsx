@@ -23,11 +23,12 @@ export default async function AnalyticsPage({
   const slug = slugRaw ? slugRaw.toLowerCase() : undefined;
   const campaignId = sp.campaignId?.trim();
 
+  const scopedDefault = slug || campaignId ? "all" : "30d";
   const resolved = resolveAnalyticsRange({
     range: sp.range,
     from: sp.from,
     to: sp.to,
-    defaultPreset: "30d",
+    defaultPreset: scopedDefault,
   });
 
   if (!resolved.ok) {
@@ -69,22 +70,35 @@ export default async function AnalyticsPage({
       ? { campaignId: scopeCampaign.id }
       : undefined;
 
-  const [series, metrics, referrers, devices] = await Promise.all([
+  const [series, rangeMetrics, referrers, devices] = await Promise.all([
     analyticsRepository.clicksByDayInRange(from, to, scope),
     analyticsRepository.rangeMetrics(from, to, scope),
     analyticsRepository.topReferrersInRange(from, to, scope, 8),
     analyticsRepository.deviceMixInRange(from, to, scope, 8),
   ]);
 
+  let metrics = rangeMetrics;
+  if (preset === "all" && scope) {
+    const lifetime = await analyticsRepository.scopedLifetimeMetrics(scope);
+    if (lifetime) metrics = lifetime;
+  }
+
   const pageHint = `${label} (UTC) · rollup-backed reads · cache TTL ${cacheTtl}s. Clicks may lag ~1 min until the worker ingests; rollups refresh on cron. Unique visitors sum daily buckets${
     scopeLink ? "" : scopeCampaign ? " for this campaign" : " (not deduplicated across links)"
   }.`;
 
-  const summaryHint = scopeLink
-    ? `Total and unique clicks from daily rollups for ${scopeLink.slug}.`
-    : scopeCampaign
-      ? `Total and unique clicks from campaign rollups for ${scopeCampaign.name}.`
-      : "Total and unique clicks from daily rollups · all links.";
+  const summaryHint =
+    preset === "all" && scope
+      ? scopeLink
+        ? `Lifetime clicks and visits for ${scopeLink.slug} (same as the links list). Charts use daily rollups where available.`
+        : scopeCampaign
+          ? `Lifetime clicks and visits summed across campaign links (same as campaign lists). Charts use daily rollups where available.`
+          : "Lifetime clicks and visits across all links."
+      : scopeLink
+        ? `Total and unique clicks from daily rollups for ${scopeLink.slug}.`
+        : scopeCampaign
+          ? `Total and unique clicks from link rollups in this campaign for ${scopeCampaign.name}.`
+          : "Total and unique clicks from daily rollups · all links.";
 
   const shareUrl =
     scopeLink && appOrigin
