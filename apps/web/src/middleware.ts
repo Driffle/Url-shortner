@@ -8,10 +8,15 @@ import { rejectUnknownAppHost } from "@/server/middleware-app-host";
 const protectedPrefixes = ["/dashboard", "/links", "/campaigns", "/analytics", "/utm", "/settings"];
 
 export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Internal probes (Docker healthcheck, k8s) hit 127.0.0.1 without a public Host.
+  if (pathname === "/api/health" || pathname.startsWith("/api/health/")) {
+    return NextResponse.next();
+  }
+
   const hostReject = rejectUnknownAppHost(req);
   if (hostReject) return hostReject;
-
-  const { pathname } = req.nextUrl;
   const isProtected = protectedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!isProtected) return NextResponse.next();
 
