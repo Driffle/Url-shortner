@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { publicOriginFromAppHost } from "@/shared/lib/auth-redirect";
 import {
   ensureGoogleOAuthCallbackEnv,
   googleOAuthCallbackUrlForHost,
@@ -12,7 +13,7 @@ function hostAllowedForOAuth(host: string): boolean {
   return isAllowedAppHost(host, allowed);
 }
 
-/** Set `GOOGLE_OAUTH_CALLBACK_URL` from the incoming Host before Auth.js handles OAuth. */
+/** Align Auth.js env (callback + base URL) with the incoming Host before OAuth handlers run. */
 export function syncGoogleOAuthCallbackFromRequest(req: NextRequest | Request): void {
   if (!isMultiHostOAuthEnabled()) {
     ensureGoogleOAuthCallbackEnv();
@@ -23,6 +24,9 @@ export function syncGoogleOAuthCallbackFromRequest(req: NextRequest | Request): 
     ensureGoogleOAuthCallbackEnv();
     return;
   }
+  const origin = publicOriginFromAppHost(host);
+  process.env.AUTH_URL = origin;
+  process.env.NEXTAUTH_URL = origin;
   process.env.GOOGLE_OAUTH_CALLBACK_URL = googleOAuthCallbackUrlForHost(host);
 }
 
