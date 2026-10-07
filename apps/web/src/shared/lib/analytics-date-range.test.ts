@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { defaultCustomRangeIsoDates, resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
+import {
+  defaultCustomRangeIsoDates,
+  defaultReportingRange,
+  resolveAnalyticsRange,
+} from "@/shared/lib/analytics-date-range";
 
 describe("resolveAnalyticsRange", () => {
   it("resolves 7d preset", () => {
@@ -17,6 +21,12 @@ describe("resolveAnalyticsRange", () => {
     if (!r.ok) return;
     assert.equal(r.value.preset, "all");
     assert.equal(r.value.label, "All time");
+  });
+
+  it("defaultReportingRange is 30d", () => {
+    const r = defaultReportingRange();
+    assert.equal(r.preset, "30d");
+    assert.equal(r.label, "Last 30 days");
   });
 
   it("rejects invalid custom without dates", () => {

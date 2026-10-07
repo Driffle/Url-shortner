@@ -5,6 +5,8 @@ import { CreateCampaignForm } from "@/features/campaigns/components/create-campa
 import { Button } from "@/shared/ui/button";
 import { IconLinkButton } from "@/shared/ui/icon-link-button";
 import { BarChart3, Eye } from "lucide-react";
+import { analyticsRepository } from "@/server/repositories/analytics-repository";
+import { defaultReportingRange } from "@/shared/lib/analytics-date-range";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,8 @@ export default async function CampaignsPage({
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const skip = (page - 1) * PAGE_SIZE;
 
+  const reporting = defaultReportingRange();
+
   const [campaigns, total] = await Promise.all([
     prisma.campaign.findMany({
       where: { archivedAt: null },
@@ -27,11 +31,16 @@ export default async function CampaignsPage({
       skip,
       include: {
         _count: { select: { links: true } },
-        links: { select: { clickCount: true } },
       },
     }),
     prisma.campaign.count({ where: { archivedAt: null } }),
   ]);
+
+  const clicksInRange = await analyticsRepository.campaignClickTotalsInRange(
+    reporting.from,
+    reporting.to,
+    campaigns.map((c) => c.id),
+  );
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -58,7 +67,7 @@ export default async function CampaignsPage({
             <>
               <ul className="divide-y rounded-md border">
                 {campaigns.map((c) => {
-                  const clicks = c.links.reduce((a, l) => a + l.clickCount, 0);
+                  const clicks = clicksInRange.get(c.id) ?? 0;
                   return (
                     <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                       <div>
@@ -66,13 +75,13 @@ export default async function CampaignsPage({
                           {c.name}
                         </Link>
                         <p className="text-xs text-muted-foreground">
-                          {c.status} · {c._count.links} links · {clicks.toLocaleString()} clicks
+                          {c.status} · {c._count.links} links · {clicks.toLocaleString()} clicks (30d)
                         </p>
                       </div>
                       <div className="flex items-center gap-0.5">
                         <IconLinkButton href={`/campaigns/${c.id}`} icon={Eye} label={`View ${c.name}`} />
                         <IconLinkButton
-                          href={`/analytics?campaignId=${c.id}&range=all`}
+                          href={`/analytics?campaignId=${c.id}&range=30d`}
                           icon={BarChart3}
                           label={`Analytics for ${c.name}`}
                         />

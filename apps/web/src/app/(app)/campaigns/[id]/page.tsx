@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
-import { resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
+import { analyticsRepository } from "@/server/repositories/analytics-repository";
+import { defaultReportingRange } from "@/shared/lib/analytics-date-range";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { getRequestAppHost } from "@/server/request-app-host";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
@@ -19,7 +20,6 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     where: { id, archivedAt: null },
     include: {
       links: {
-        orderBy: { clickCount: "desc" },
         take: 100,
         select: { id: true, slug: true, clickCount: true, visitCount: true, status: true },
       },
@@ -27,27 +27,21 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   });
   if (!campaign) notFound();
 
-  const range = resolveAnalyticsRange({ defaultPreset: "30d" });
-  if (!range.ok) notFound();
-  const { from, to } = range.value;
+  const reporting = defaultReportingRange();
+  const { from, to, label } = reporting;
 
-  const rollupRows = await prisma.analyticsRollup.findMany({
-    where: {
-      scopeType: "CAMPAIGN",
-      scopeId: id,
-      bucketStart: { gte: from, lte: to },
-    },
-    select: { totalClicks: true, uniqueClicks: true },
-  });
+  const [periodMetrics, clicksByLink] = await Promise.all([
+    analyticsRepository.rangeMetrics(from, to, { campaignId: id }),
+    analyticsRepository.linkClickTotalsInRange(
+      from,
+      to,
+      campaign.links.map((l) => l.id),
+    ),
+  ]);
 
-  let periodClicks = 0;
-  let periodUnique = 0;
-  for (const r of rollupRows) {
-    periodClicks += r.totalClicks;
-    periodUnique += r.uniqueClicks;
-  }
-
-  const lifetimeClicks = campaign.links.reduce((a, l) => a + l.clickCount, 0);
+  const linksSorted = [...campaign.links].sort(
+    (a, b) => (clicksByLink.get(b.id) ?? 0) - (clicksByLink.get(a.id) ?? 0),
+  );
 
   return (
     <div className="space-y-6">
@@ -55,12 +49,13 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{campaign.name}</h1>
           <p className="text-muted-foreground">
-            {campaign.status} · {campaign.links.length} links · {lifetimeClicks.toLocaleString()} lifetime clicks
+            {campaign.status} · {campaign.links.length} links ·{" "}
+            {periodMetrics.totalClicks.toLocaleString()} clicks ({label.toLowerCase()})
           </p>
         </div>
         <div className="flex items-center gap-2">
           <IconLinkButton
-            href={`/analytics?campaignId=${id}&range=all`}
+            href={`/analytics?campaignId=${id}&range=30d`}
             icon={BarChart3}
             label="Campaign analytics"
           />
@@ -72,16 +67,16 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
       <Card>
         <CardHeader>
-          <CardTitle>Last 30 days (rollup)</CardTitle>
+          <CardTitle>{label}</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-8 text-sm">
           <div>
             <p className="text-muted-foreground">Clicks</p>
-            <p className="text-xl font-semibold">{periodClicks.toLocaleString()}</p>
+            <p className="text-xl font-semibold">{periodMetrics.totalClicks.toLocaleString()}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Unique (rollup sum)</p>
-            <p className="text-xl font-semibold">{periodUnique.toLocaleString()}</p>
+            <p className="text-xl font-semibold">{periodMetrics.uniqueClicks.toLocaleString()}</p>
           </div>
         </CardContent>
       </Card>
@@ -92,16 +87,18 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </CardHeader>
         <CardContent>
           <ul className="divide-y rounded-md border text-sm">
-            {campaign.links.map((l) => (
+            {linksSorted.map((l) => (
               <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                <Link href={`/analytics?slug=${l.slug}&range=all`} className="font-mono text-primary hover:underline">
+                <Link href={`/analytics?slug=${l.slug}&range=30d`} className="font-mono text-primary hover:underline">
                   {publicShortUrl(l.slug, requestHost)}
                 </Link>
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{l.clickCount.toLocaleString()} clicks</span>
+                  <span className="text-muted-foreground">
+                    {(clicksByLink.get(l.id) ?? 0).toLocaleString()} clicks (30d)
+                  </span>
                   <LinkStatusBadge status={l.status} />
                   <IconLinkButton
-                    href={`/analytics?slug=${encodeURIComponent(l.slug)}&range=all`}
+                    href={`/analytics?slug=${encodeURIComponent(l.slug)}&range=30d`}
                     icon={BarChart3}
                     label={`Analytics for ${l.slug}`}
                   />

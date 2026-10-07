@@ -5,7 +5,7 @@ import { analyticsRepository } from "@/server/repositories/analytics-repository"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { KpiStrip } from "@/features/dashboard/components/kpi-strip";
 import { ClickTrendChart } from "@/features/analytics/components/click-trend-chart";
-import { resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
+import { analyticsRangeQueryString, resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
 import { Button } from "@/shared/ui/button";
 import { IconLinkButton } from "@/shared/ui/icon-link-button";
 import { BarChart3 } from "lucide-react";
@@ -30,7 +30,7 @@ export default async function DashboardPage({
   searchParams: Promise<{ range?: string }>;
 }) {
   const sp = await searchParams;
-  const resolved = resolveAnalyticsRange({ range: sp.range, defaultPreset: "14d" });
+  const resolved = resolveAnalyticsRange({ range: sp.range, defaultPreset: "30d" });
   if (!resolved.ok) {
     return (
       <div className="space-y-4">
@@ -47,17 +47,17 @@ export default async function DashboardPage({
   const { from, to, label } = resolved.value;
   const range = resolved.value;
 
-  const [linkCount, campaignCount, clickSum, series, top, recent] = await Promise.all([
+  const [linkCount, campaignCount, periodMetrics, series, top, recent] = await Promise.all([
     prisma.link.count({ where: { status: LinkStatus.ACTIVE } }),
     prisma.campaign.count({ where: { archivedAt: null } }),
-    prisma.link.aggregate({ _sum: { clickCount: true } }),
+    analyticsRepository.rangeMetrics(from, to),
     analyticsRepository.clicksByDayInRange(from, to),
-    analyticsRepository.topCampaigns(5),
+    analyticsRepository.topCampaignsInRange(from, to, 5),
     analyticsRepository.recentClicks(12),
   ]);
 
-  const totalClicks = clickSum._sum.clickCount ?? 0;
-  const allTimeAnalyticsHref = `/analytics?range=all`;
+  const totalClicks = periodMetrics.totalClicks;
+  const analyticsHref = `/analytics?${analyticsRangeQueryString(range)}`;
 
   return (
     <div className="space-y-8">
@@ -68,19 +68,19 @@ export default async function DashboardPage({
         </div>
         <div className="flex flex-wrap gap-2">
           {(["7d", "14d", "30d"] as const).map((r) => (
-            <Button key={r} variant={sp.range === r || (!sp.range && r === "14d") ? "default" : "outline"} size="sm" asChild>
+            <Button key={r} variant={sp.range === r || (!sp.range && r === "30d") ? "default" : "outline"} size="sm" asChild>
               <Link href={`/dashboard?range=${r}`}>{r === "7d" ? "7 days" : r === "14d" ? "14 days" : "30 days"}</Link>
             </Button>
           ))}
           <Button variant="secondary" size="sm" asChild>
-            <Link href={allTimeAnalyticsHref}>View in Analytics</Link>
+            <Link href={analyticsHref}>View in Analytics</Link>
           </Button>
         </div>
       </div>
 
       <KpiStrip
         items={[
-          { label: "Total clicks", value: totalClicks.toLocaleString() },
+          { label: `Clicks (${label.toLowerCase()})`, value: totalClicks.toLocaleString() },
           { label: "Active links", value: linkCount.toLocaleString() },
           { label: "Campaigns", value: campaignCount.toLocaleString() },
         ]}
@@ -100,7 +100,7 @@ export default async function DashboardPage({
         <Card>
           <CardHeader>
             <CardTitle>Top campaigns</CardTitle>
-            <CardDescription>By summed link clicks.</CardDescription>
+            <CardDescription>By link rollups · {label}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {top.length === 0 ? (
@@ -114,7 +114,7 @@ export default async function DashboardPage({
                   <div className="flex shrink-0 items-center gap-1">
                     <span className="text-muted-foreground">{c.clicks.toLocaleString()}</span>
                     <IconLinkButton
-                      href={`/analytics?campaignId=${c.id}&range=all`}
+                      href={`/analytics?campaignId=${c.id}&range=${range.preset}`}
                       icon={BarChart3}
                       label={`Analytics for ${c.name}`}
                     />
@@ -138,7 +138,7 @@ export default async function DashboardPage({
             ) : (
               recent.map((e) => (
                 <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-                  <Link href={`/analytics?slug=${e.link.slug}&range=all`} className="font-mono text-xs text-primary hover:underline">
+                  <Link href={`/analytics?slug=${e.link.slug}&range=${range.preset}`} className="font-mono text-xs text-primary hover:underline">
                     {e.link.slug}
                   </Link>
                   <span className="text-muted-foreground">

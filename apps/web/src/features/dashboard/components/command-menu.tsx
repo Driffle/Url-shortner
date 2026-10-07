@@ -102,7 +102,7 @@ export function CommandMenu() {
                 <Command.Item
                   key={l.slug}
                   value={`${l.slug} ${l.destinationUrl}`}
-                  onSelect={() => onSelect(`/analytics?slug=${l.slug}&range=all`)}
+                  onSelect={() => onSelect(`/analytics?slug=${l.slug}&range=30d`)}
                   className="flex cursor-pointer select-none flex-col items-start rounded-md px-2 py-2 text-sm aria-selected:bg-accent"
                 >
                   <span className="font-mono">{l.slug}</span>

@@ -51,7 +51,7 @@ export default async function PublicAnalyticsSharePage({
     range: sp.range,
     from: sp.from,
     to: sp.to,
-    defaultPreset: "all",
+    defaultPreset: "30d",
   });
 
   if (!resolved.ok) {
@@ -85,8 +85,8 @@ export default async function PublicAnalyticsSharePage({
 
   const summaryHint =
     preset === "all"
-      ? `Lifetime clicks and visits for ${link.slug} (same as the links list). Charts use daily rollups where available.`
-      : `Total and unique clicks from daily rollups for ${link.slug}.`;
+      ? `Lifetime clicks and visits for ${link.slug}. Charts use daily rollups where available.`
+      : `Total and unique clicks from daily rollups for ${link.slug} (same window as the links list when set to 30d).`;
 
   return (
     <ShareShell slug={link.slug}>

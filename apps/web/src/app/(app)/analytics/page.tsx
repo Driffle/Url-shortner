@@ -23,12 +23,11 @@ export default async function AnalyticsPage({
   const slug = slugRaw ? slugRaw.toLowerCase() : undefined;
   const campaignId = sp.campaignId?.trim();
 
-  const scopedDefault = slug || campaignId ? "all" : "30d";
   const resolved = resolveAnalyticsRange({
     range: sp.range,
     from: sp.from,
     to: sp.to,
-    defaultPreset: scopedDefault,
+    defaultPreset: "30d",
   });
 
   if (!resolved.ok) {
@@ -90,14 +89,14 @@ export default async function AnalyticsPage({
   const summaryHint =
     preset === "all" && scope
       ? scopeLink
-        ? `Lifetime clicks and visits for ${scopeLink.slug} (same as the links list). Charts use daily rollups where available.`
+        ? `Lifetime clicks and visits for ${scopeLink.slug}. Charts use daily rollups where available.`
         : scopeCampaign
-          ? `Lifetime clicks and visits summed across campaign links (same as campaign lists). Charts use daily rollups where available.`
+          ? `Lifetime clicks and visits summed across campaign links. Charts use daily rollups where available.`
           : "Lifetime clicks and visits across all links."
       : scopeLink
-        ? `Total and unique clicks from daily rollups for ${scopeLink.slug}.`
+        ? `Total and unique clicks from daily rollups for ${scopeLink.slug} (matches the links list for the same range).`
         : scopeCampaign
-          ? `Total and unique clicks from link rollups in this campaign for ${scopeCampaign.name}.`
+          ? `Total and unique clicks from link rollups in this campaign for ${scopeCampaign.name} (matches campaign lists for the same range).`
           : "Total and unique clicks from daily rollups · all links.";
 
   const shareUrl =
