@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
 
-# Google OAuth redirect_uri must match Console; Deployer often leaves NEXTAUTH_URL unset at compose time.
-if [ -z "${GOOGLE_OAUTH_CALLBACK_URL:-}" ]; then
+# Multi-domain: callback is set per request from Host when ALLOWED_APP_HOSTS is configured.
+if [ -n "${ALLOWED_APP_HOSTS:-}" ]; then
+  echo "driffle-links: multi-host mode (ALLOWED_APP_HOSTS); Google callback follows request Host"
+elif [ -z "${GOOGLE_OAUTH_CALLBACK_URL:-}" ]; then
   base="${AUTH_URL:-${NEXTAUTH_URL:-}}"
   if [ -z "$base" ]; then
     base="${PUBLIC_APP_URL:-}"

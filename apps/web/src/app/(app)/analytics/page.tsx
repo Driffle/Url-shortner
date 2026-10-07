@@ -6,6 +6,7 @@ import { AnalyticsLinkReport } from "@/features/analytics/components/analytics-l
 import { ShareAnalyticsViewButton } from "@/features/analytics/components/share-analytics-view-button";
 import { getEnv } from "@/shared/validations/env";
 import { InfoTip } from "@/shared/ui/info-tip";
+import { getRequestAppHost } from "@/server/request-app-host";
 import { publicAnalyticsShareUrl } from "@/shared/lib/public-analytics-share-url";
 import { resolveAnalyticsRange, type AnalyticsRangePreset } from "@/shared/lib/analytics-date-range";
 
@@ -17,6 +18,7 @@ export default async function AnalyticsPage({
   searchParams: Promise<{ slug?: string; campaignId?: string; range?: string; from?: string; to?: string }>;
 }) {
   const sp = await searchParams;
+  const requestHost = await getRequestAppHost();
   const slugRaw = sp.slug?.trim();
   const slug = slugRaw ? slugRaw.toLowerCase() : undefined;
   const campaignId = sp.campaignId?.trim();
@@ -132,6 +134,7 @@ export default async function AnalyticsPage({
         referrers={referrers}
         devices={devices}
         link={scopeLink}
+        requestHost={requestHost}
         shareSlot={shareUrl ? <ShareAnalyticsViewButton shareUrl={shareUrl} /> : undefined}
       />
     </div>

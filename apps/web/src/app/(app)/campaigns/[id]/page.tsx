@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { resolveAnalyticsRange } from "@/shared/lib/analytics-date-range";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
+import { getRequestAppHost } from "@/server/request-app-host";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
 import { Button } from "@/shared/ui/button";
 import { IconLinkButton } from "@/shared/ui/icon-link-button";
@@ -12,6 +13,7 @@ import { BarChart3 } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const requestHost = await getRequestAppHost();
   const { id } = await params;
   const campaign = await prisma.campaign.findFirst({
     where: { id, archivedAt: null },
@@ -93,7 +95,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             {campaign.links.map((l) => (
               <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                 <Link href={`/analytics?slug=${l.slug}&range=30d`} className="font-mono text-primary hover:underline">
-                  {publicShortUrl(l.slug)}
+                  {publicShortUrl(l.slug, requestHost)}
                 </Link>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">{l.clickCount.toLocaleString()} clicks</span>

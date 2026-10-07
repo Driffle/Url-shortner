@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { handlers } from "@/auth";
+import { syncGoogleOAuthCallbackFromRequest } from "@/server/auth-oauth-host";
 
 /**
  * Google OAuth redirect target: `/api/auth/google/callback`
@@ -12,9 +13,11 @@ function forwardToAuthCallback(req: NextRequest): NextRequest {
 }
 
 export async function GET(req: NextRequest) {
+  syncGoogleOAuthCallbackFromRequest(req);
   return handlers.GET(forwardToAuthCallback(req));
 }
 
 export async function POST(req: NextRequest) {
+  syncGoogleOAuthCallbackFromRequest(req);
   return handlers.POST(forwardToAuthCallback(req));
 }
