@@ -3,10 +3,14 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { isAuthBypassed } from "@/shared/lib/auth-bypass";
 import { getEnv } from "@/shared/validations/env";
+import { rejectUnknownAppHost } from "@/server/middleware-app-host";
 
 const protectedPrefixes = ["/dashboard", "/links", "/campaigns", "/analytics", "/utm", "/settings"];
 
 export async function middleware(req: NextRequest) {
+  const hostReject = rejectUnknownAppHost(req);
+  if (hostReject) return hostReject;
+
   const { pathname } = req.nextUrl;
   const isProtected = protectedPrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!isProtected) return NextResponse.next();
@@ -29,5 +33,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|r/|go/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

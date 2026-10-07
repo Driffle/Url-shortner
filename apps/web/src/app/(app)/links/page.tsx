@@ -7,6 +7,7 @@ import { getRedis, RedisKeys } from "@/server/redis/client";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Input } from "@/shared/ui/input";
+import { getRequestAppHost } from "@/server/request-app-host";
 import { publicShortUrl } from "@/shared/lib/short-link-url";
 import { can, Permissions } from "@/shared/lib/rbac";
 import { LinkRowActions } from "@/features/links/components/link-row-actions";
@@ -69,6 +70,7 @@ export default async function LinksPage({
 }: {
   searchParams: Promise<{ page?: string; q?: string; status?: string }>;
 }) {
+  const requestHost = await getRequestAppHost();
   const session = await getAppSession();
   const canEdit = session?.user?.role ? can(session.user.role, Permissions.editLinks) : false;
   const sp = await searchParams;
@@ -171,7 +173,7 @@ export default async function LinksPage({
                   <tbody>
                     {links.map((l) => (
                       <tr key={l.id} className="border-b border-border/60">
-                        <td className="py-3 pr-4 font-mono text-xs">{publicShortUrl(l.slug)}</td>
+                        <td className="py-3 pr-4 font-mono text-xs">{publicShortUrl(l.slug, requestHost)}</td>
                         <td className="max-w-xs truncate py-3 pr-4">{l.destinationUrl}</td>
                         <td className="py-3 pr-4">{l.campaign?.name ?? "—"}</td>
                         <td className="py-3 pr-4">{l.clickCount.toLocaleString()}</td>

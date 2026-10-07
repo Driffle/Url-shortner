@@ -58,8 +58,9 @@ Omit them or set to `false` to require Google OAuth. Local-only bypass: `DISABLE
 | `GOOGLE_CLIENT_ID` | Yes† | Google OAuth Web client ID |
 | `GOOGLE_CLIENT_SECRET` | Yes† | Google OAuth client secret |
 | `PUBLIC_APP_URL` | Yes | Usually same as `NEXTAUTH_URL` for local |
-| `SHORT_LINK_HOST` | Yes | Host shown in UI for short links (e.g. `localhost:3000` locally) |
-| `NEXT_PUBLIC_SHORT_LINK_HOST` | Optional | Same as `SHORT_LINK_HOST` if you want the browser to show it |
+| `SHORT_LINK_HOST` | Yes | Fallback host for scripts/cron; UI uses the **request Host** when present |
+| `NEXT_PUBLIC_SHORT_LINK_HOST` | Optional | Browser fallback when no server request context |
+| `ALLOWED_APP_HOSTS` | Prod multi-domain | Comma-separated FQDNs (e.g. `shortly.driffle.net,driffle.link`); unknown Host → 404; per-host Google callback |
 | `ALLOWED_EMAIL_DOMAIN` | Optional | Defaults to `driffle.com` — only that domain can sign in |
 | `ADMIN_EMAILS` | Optional | Comma-separated emails granted `ADMIN` on each login (e.g. `you@driffle.com,other@driffle.com`) |
 | `BOOTSTRAP_ADMIN_EMAIL` | Optional | Legacy single email — same as one entry in `ADMIN_EMAILS` |

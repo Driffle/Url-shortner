@@ -1,3 +1,5 @@
+import { normalizeAppHost } from "@/shared/lib/app-host";
+
 /** OAuth redirect path registered in Google Cloud Console for this app. */
 export const GOOGLE_OAUTH_CALLBACK_PATH = "/api/auth/google/callback";
 
@@ -13,6 +15,25 @@ function originFromUrlLike(raw: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Per-host Google redirect URI (must be registered in Google Console for each public hostname). */
+export function googleOAuthCallbackUrlForHost(host: string): string {
+  const h = normalizeAppHost(host);
+  const isLocal = h.startsWith("127.0.0.1") || h === "localhost";
+  const origin = isLocal ? `http://${h === "localhost" ? "127.0.0.1:3000" : h}` : `https://${h}`;
+  return `${origin}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+}
+
+/** True when OAuth redirect should follow the request Host (multi-domain Shortly). */
+export function isMultiHostOAuthEnabled(): boolean {
+  const raw = trimEnv("ALLOWED_APP_HOSTS");
+  if (raw) {
+    const parts = raw.split(",").map((p) => normalizeAppHost(p)).filter(Boolean);
+    if (parts.length >= 1) return true;
+  }
+  const flag = (process.env.MULTI_HOST_OAUTH ?? "").trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
 }
 
 /**
@@ -33,9 +54,9 @@ export function googleOAuthCallbackUrl(): string {
 
   const host = trimEnv("SHORT_LINK_HOST") ?? trimEnv("NEXT_PUBLIC_SHORT_LINK_HOST");
   if (host) {
-    const hostname = host.replace(/^https?:\/\//, "").split("/")[0];
+    const hostname = normalizeAppHost(host);
     if (hostname && !hostname.startsWith("127.0.0.1") && hostname !== "localhost") {
-      return `https://${hostname}${GOOGLE_OAUTH_CALLBACK_PATH}`;
+      return googleOAuthCallbackUrlForHost(hostname);
     }
   }
 
@@ -46,11 +67,11 @@ export function googleOAuthCallbackUrl(): string {
     );
   }
 
-  // Local dev only
-  return `http://127.0.0.1:3000${GOOGLE_OAUTH_CALLBACK_PATH}`;
+  return googleOAuthCallbackUrlForHost("127.0.0.1:3000");
 }
 
-/** Refresh on each process start (and before Auth.js loads providers). */
+/** Pin callback at process start for single-host mode; skip when multi-host allowlist is configured. */
 export function ensureGoogleOAuthCallbackEnv(): void {
+  if (isMultiHostOAuthEnabled()) return;
   process.env.GOOGLE_OAUTH_CALLBACK_URL = googleOAuthCallbackUrl();
 }

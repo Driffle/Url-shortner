@@ -18,6 +18,8 @@ type Props = {
   referrers: ReferrerRow[];
   devices: DeviceRow[];
   link?: LinkInfo | null;
+  /** Host the user is viewing (for short URL display). */
+  requestHost?: string;
   shareSlot?: React.ReactNode;
 };
 
@@ -29,6 +31,7 @@ export function AnalyticsLinkReport({
   referrers,
   devices,
   link,
+  requestHost,
   shareSlot,
 }: Props) {
   return (
@@ -58,7 +61,9 @@ export function AnalyticsLinkReport({
             <CardTitle>Short URL</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <p className="break-all font-mono text-base font-medium text-primary">{publicShortUrl(link.slug)}</p>
+            <p className="break-all font-mono text-base font-medium text-primary">
+              {publicShortUrl(link.slug, requestHost)}
+            </p>
             <p className="text-muted-foreground">
               Lifetime clicks: {link.clickCount.toLocaleString()} · Visits: {link.visitCount.toLocaleString()}
             </p>

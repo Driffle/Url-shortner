@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/server/db/prisma";
+import { getRequestAppHost } from "@/server/request-app-host";
 import { CreateLinkForm } from "@/features/links/components/create-link-form";
 import { Button } from "@/shared/ui/button";
 
@@ -11,6 +12,7 @@ export default async function NewLinkPage({
   searchParams: Promise<{ destinationUrl?: string }>;
 }) {
   const sp = await searchParams;
+  const requestHost = await getRequestAppHost();
   const campaigns = await prisma.campaign.findMany({
     where: { archivedAt: null },
     orderBy: { updatedAt: "desc" },
@@ -31,7 +33,7 @@ export default async function NewLinkPage({
       </div>
       <CreateLinkForm
         campaigns={campaigns}
-        shortLinkHost={process.env.SHORT_LINK_HOST ?? process.env.NEXT_PUBLIC_SHORT_LINK_HOST ?? "go.driffle.com"}
+        shortLinkHost={requestHost || process.env.SHORT_LINK_HOST || "go.driffle.com"}
         defaultDestination={sp.destinationUrl}
       />
     </div>

@@ -129,6 +129,10 @@ const envSchema = z
     SHORT_LINK_HOST: z.string().min(1).default("go.driffle.com"),
     /** Exposed to browser for display (optional; falls back to SHORT_LINK_HOST server-side). */
     NEXT_PUBLIC_SHORT_LINK_HOST: z.preprocess(emptyEnvToUndefined, z.string().min(1).optional()),
+    /** Comma-separated public FQDNs (e.g. shortly.driffle.net,driffle.link). Unknown Host → 404; enables per-host OAuth when set. */
+    ALLOWED_APP_HOSTS: z.preprocess(emptyEnvToUndefined, z.string().min(1).optional()),
+    /** Force per-request Google callback even without ALLOWED_APP_HOSTS (optional). */
+    MULTI_HOST_OAUTH: z.string().optional(),
 
     // Optional: internal API for click ingestion HMAC
     INTERNAL_CLICK_SECRET: z.preprocess(emptyEnvToUndefined, z.string().min(16).optional()),

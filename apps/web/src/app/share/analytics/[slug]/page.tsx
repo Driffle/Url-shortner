@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { analyticsRepository } from "@/server/repositories/analytics-repository";
+import { getRequestAppHost } from "@/server/request-app-host";
 import { AnalyticsLinkReport } from "@/features/analytics/components/analytics-link-report";
 import { ShareAnalyticsRangeToolbar } from "@/features/analytics/components/share-analytics-range-toolbar";
 import { resolveAnalyticsRange, type AnalyticsRangePreset } from "@/shared/lib/analytics-date-range";
@@ -34,6 +35,7 @@ export default async function PublicAnalyticsSharePage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
+  const requestHost = await getRequestAppHost();
   const { slug: slugParam } = await params;
   const slug = decodeURIComponent(slugParam).trim().toLowerCase();
   if (!slug) notFound();
@@ -95,6 +97,7 @@ export default async function PublicAnalyticsSharePage({
         referrers={referrers}
         devices={devices}
         link={link}
+        requestHost={requestHost}
       />
     </ShareShell>
   );

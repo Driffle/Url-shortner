@@ -35,6 +35,7 @@ services:
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-${NEXTAUTH_URL:-https://shortly.driffle.net}}
       SHORT_LINK_HOST: ${SHORT_LINK_HOST:-shortly.driffle.net}
       NEXT_PUBLIC_SHORT_LINK_HOST: ${NEXT_PUBLIC_SHORT_LINK_HOST:-shortly.driffle.net}
+      ALLOWED_APP_HOSTS: ${ALLOWED_APP_HOSTS:-}
       ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-driffle.com}
       # Comma-separated emails promoted to ADMIN on login (e.g. you@driffle.com,other@driffle.com)
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}

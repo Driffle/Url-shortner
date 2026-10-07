@@ -1,7 +1,9 @@
 import { getAppSession } from "@/server/auth-session";
 import { prisma } from "@/server/db/prisma";
 import { can, Permissions } from "@/shared/lib/rbac";
+import { getRequestAppHostFromRequest } from "@/server/request-app-host";
 import { publicInstantShortUrl, publicShortUrl } from "@/shared/lib/short-link-url";
+import type { NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,8 @@ function csvEscape(s: string) {
 
 const BATCH = 500;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const requestHost = getRequestAppHostFromRequest(req);
   const session = await getAppSession();
   if (!session?.user?.role || !can(session.user.role, Permissions.readAnalytics)) {
     return new Response("Unauthorized", { status: 401 });
@@ -45,8 +48,8 @@ export async function GET() {
         for (const l of batch) {
           const row = [
             l.slug,
-            publicShortUrl(l.slug),
-            publicInstantShortUrl(l.slug),
+            publicShortUrl(l.slug, requestHost),
+            publicInstantShortUrl(l.slug, requestHost),
             l.destinationUrl,
             l.campaign?.name ?? "",
             String(l.clickCount),
