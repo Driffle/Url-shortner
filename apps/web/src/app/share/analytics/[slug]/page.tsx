@@ -51,7 +51,7 @@ export default async function PublicAnalyticsSharePage({
     range: sp.range,
     from: sp.from,
     to: sp.to,
-    defaultPreset: "30d",
+    defaultPreset: "all",
   });
 
   if (!resolved.ok) {
@@ -71,14 +71,22 @@ export default async function PublicAnalyticsSharePage({
   const { from, to, label, preset } = resolved.value;
 
   const scope = { linkId: link.id };
-  const [series, metrics, referrers, devices] = await Promise.all([
+  const [series, rangeMetrics, referrers, devices] = await Promise.all([
     analyticsRepository.clicksByDayInRange(from, to, scope),
     analyticsRepository.rangeMetrics(from, to, scope),
     analyticsRepository.topReferrersInRange(from, to, scope, 8),
     analyticsRepository.deviceMixInRange(from, to, scope, 8),
   ]);
 
-  const summaryHint = `Total and unique clicks from daily rollups for ${link.slug}.`;
+  let metrics = rangeMetrics;
+  if (preset === "all") {
+    metrics = { totalClicks: link.clickCount, uniqueClicks: link.visitCount };
+  }
+
+  const summaryHint =
+    preset === "all"
+      ? `Lifetime clicks and visits for ${link.slug} (same as the links list). Charts use daily rollups where available.`
+      : `Total and unique clicks from daily rollups for ${link.slug}.`;
 
   return (
     <ShareShell slug={link.slug}>

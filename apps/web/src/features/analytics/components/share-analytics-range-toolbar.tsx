@@ -8,6 +8,7 @@ import { Input } from "@/shared/ui/input";
 import { Label } from "@/shared/ui/label";
 
 const PRESETS: { id: AnalyticsRangePreset; label: string }[] = [
+  { id: "all", label: "All time" },
   { id: "today", label: "Today" },
   { id: "yesterday", label: "Yesterday" },
   { id: "7d", label: "7d" },

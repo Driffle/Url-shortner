@@ -60,7 +60,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </div>
         <div className="flex items-center gap-2">
           <IconLinkButton
-            href={`/analytics?campaignId=${id}&range=30d`}
+            href={`/analytics?campaignId=${id}&range=all`}
             icon={BarChart3}
             label="Campaign analytics"
           />
@@ -94,14 +94,14 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           <ul className="divide-y rounded-md border text-sm">
             {campaign.links.map((l) => (
               <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                <Link href={`/analytics?slug=${l.slug}&range=30d`} className="font-mono text-primary hover:underline">
+                <Link href={`/analytics?slug=${l.slug}&range=all`} className="font-mono text-primary hover:underline">
                   {publicShortUrl(l.slug, requestHost)}
                 </Link>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">{l.clickCount.toLocaleString()} clicks</span>
                   <LinkStatusBadge status={l.status} />
                   <IconLinkButton
-                    href={`/analytics?slug=${encodeURIComponent(l.slug)}&range=30d`}
+                    href={`/analytics?slug=${encodeURIComponent(l.slug)}&range=all`}
                     icon={BarChart3}
                     label={`Analytics for ${l.slug}`}
                   />
