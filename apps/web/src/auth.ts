@@ -10,6 +10,7 @@ import { prisma } from "@/server/db/prisma";
 import { getEnv } from "@/shared/validations/env";
 import { authConfig } from "@/auth.config";
 import { promoteEnvAdminByEmail, promoteEnvAdminByUserId } from "@/shared/lib/promote-env-admin";
+import { resolveAuthRedirectUrlFromHeaders } from "@/shared/lib/auth-redirect";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -42,6 +43,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token.sub) session.user.id = token.sub;
       session.user.role = (token.role as UserRole | undefined) ?? "EDITOR";
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      return resolveAuthRedirectUrlFromHeaders(url, baseUrl);
     },
   },
   events: {
